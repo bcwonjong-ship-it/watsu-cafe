@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>마음 휴카페 - 모바일 예약</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#4F7BF7">
+  <!-- ★ 캐시 방지 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css?v=20260904a">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="mobile-body">
+
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p class="loading-text">처리 중...</p>
+  </div>
+
+  <!-- 헤더 -->
+  <header class="mobile-header">
+    <div class="mobile-header-left">
+      <span class="mobile-logo">☕</span>
+      <div>
+        <h1 class="mobile-brand">마음 휴카페</h1>
+        <p class="mobile-sub">오정센터 청소년카페</p>
+      </div>
+    </div>
+    <div class="mobile-user-info" id="mobile-user-info">
+      <span class="mobile-user-name" id="m-user-name">로그인 필요</span>
+      <button class="m-logout-btn" id="m-logout-btn" onclick="mLogout()" style="display:none;">
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- 메인 컨텐츠 -->
+  <main class="mobile-main" id="mobile-main">
+
+    <!-- 로그인 화면 -->
+    <section id="m-view-auth" class="m-view active">
+      <div class="m-auth-card">
+        <div class="m-auth-icon">☕</div>
+        <h2>마음 휴카페 로그인</h2>
+        <p>키오스크에서 가입한 이름과<br>전화번호 뒷 4자리를 입력해주세요</p>
+        <div class="m-login-form">
+          <div class="m-form-group">
+            <label><i class="fas fa-user"></i> 이름 (아이디)</label>
+            <input type="text" id="m-login-name" class="m-login-input" placeholder="이름 입력" autocomplete="name">
+          </div>
+          <div class="m-form-group">
+            <label><i class="fas fa-lock"></i> 비밀번호 (전화번호 뒷 4자리)</label>
+            <input type="password" id="m-login-pin" class="m-login-input" placeholder="0000" maxlength="4" inputmode="numeric" autocomplete="current-password">
+          </div>
+          <button class="btn btn-primary btn-block btn-lg" onclick="mobileLogin()">
+            <i class="fas fa-sign-in-alt"></i> 로그인
+          </button>
+          <p class="m-login-help">
+            <i class="fas fa-info-circle"></i> 
+            키오스크에서 전화번호로 먼저 가입해주세요
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 메인 대시보드 -->
+    <section id="m-view-dashboard" class="m-view">
+      <!-- 내 이용 현황 -->
+      <div class="m-section">
+        <h3 class="m-section-title"><i class="fas fa-clipboard-list"></i> 내 이용 현황</h3>
+        <div id="m-my-status" class="m-status-list">
+          <div class="m-empty"><i class="fas fa-couch"></i><p>이용 중인 시설이 없습니다</p></div>
+        </div>
+      </div>
+
+      <!-- 내 대기 현황 -->
+      <div class="m-section" id="m-waitlist-section" style="display:none;">
+        <h3 class="m-section-title"><i class="fas fa-hourglass-half"></i> 내 대기 현황</h3>
+        <div id="m-my-waitlist" class="m-status-list"></div>
+      </div>
+
+      <!-- 시설 예약 -->
+      <div class="m-section">
+        <h3 class="m-section-title"><i class="fas fa-couch"></i> 공간 예약</h3>
+        <div class="m-facility-grid" id="m-facility-grid"></div>
+      </div>
+
+      <!-- 하단 메뉴 -->
+      <div class="m-section">
+        <div class="m-bottom-actions">
+          <button class="m-action-btn info" onclick="mCheckVisitCount()">
+            <i class="fas fa-chart-line"></i>
+            <span>이용 횟수</span>
+          </button>
+          <button class="m-action-btn danger" onclick="mHandleExit()">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>퇴장하기</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 세부 선택 -->
+    <section id="m-view-sub" class="m-view">
+      <div class="m-sub-header">
+        <button class="m-back-btn" onclick="mShowView('m-view-dashboard')">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <h3 id="m-sub-title">세부 선택</h3>
+      </div>
+      <div class="m-facility-grid" id="m-sub-buttons"></div>
+    </section>
+  </main>
+
+  <script src="js/api.js?v=20260904a"></script>
+  <script src="js/mobile.js?v=20260904a"></script>
+</body>
+</html>

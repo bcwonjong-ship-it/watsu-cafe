@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>오정센터 관리자 현황판</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ★ 캐시 방지 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css?v=20260904a">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="admin-body">
+
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p class="loading-text">불러오는 중...</p>
+  </div>
+
+  <!-- 시간초과 알림 배너 -->
+  <div id="alert-banner" class="alert-banner" style="display:none;">
+    <div class="alert-banner-content">
+      <i class="fas fa-exclamation-triangle"></i>
+      <span id="alert-banner-text">시간 초과 알림</span>
+      <button class="alert-dismiss" onclick="dismissAlert()"><i class="fas fa-times"></i></button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="admin-title">
+      <h1>🎯 오정센터 실시간 현황판</h1>
+      <span class="count-badge"><span id="count">0</span>명</span>
+      <span id="operating-status" class="operating-badge open">🟢 운영중</span>
+    </div>
+    <div class="admin-btns">
+      <button class="admin-btn btn-refresh" onclick="loadData()"><i class="fas fa-sync-alt"></i> 새로고침</button>
+      <button class="admin-btn btn-stats" onclick="openStats()"><i class="fas fa-chart-pie"></i> 월간 통계</button>
+      <a class="admin-btn" style="background:#00897B;" href="stats.html" target="_blank"><i class="fas fa-chart-line"></i> 통계 현황판</a>
+      <button class="admin-btn" style="background:#FF9800;" onclick="toggleSelectMode()"><i class="fas fa-check-double"></i> <span id="select-mode-text">선택 퇴장</span></button>
+      <button class="admin-btn btn-all-exit" onclick="handleAllExit()"><i class="fas fa-user-slash"></i> 전체 퇴장</button>
+      <button class="admin-btn" style="background:#607D8B;" onclick="openExportWithAuth()"><i class="fas fa-file-export"></i> 내보내기</button>
+      <a class="admin-btn" style="background:#2196F3;" href="members.html"><i class="fas fa-users-cog"></i> 이용자 관리</a>
+      <a class="admin-btn btn-kiosk" href="index.html"><i class="fas fa-home"></i> 키오스크</a>
+    </div>
+  </header>
+
+  <!-- 다중 선택 퇴장 바 -->
+  <div id="multi-exit-bar" class="multi-exit-bar" style="display:none;">
+    <span><i class="fas fa-check-square"></i> <strong id="selected-count">0</strong>명 선택됨</span>
+    <div>
+      <button class="admin-btn" style="background:#FF9800;" onclick="selectAllUsers()"><i class="fas fa-check-double"></i> 전체 선택</button>
+      <button class="admin-btn btn-all-exit" onclick="exitSelectedUsers()"><i class="fas fa-sign-out-alt"></i> 선택 퇴장</button>
+      <button class="admin-btn" style="background:#9CA3AF;" onclick="toggleSelectMode()"><i class="fas fa-times"></i> 취소</button>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <section class="summary-row">
+    <div class="summary-card">
+      <div class="summary-icon blue"><i class="fas fa-users"></i></div>
+      <div class="summary-info"><div class="label">현재 이용자</div><div class="value"><span id="sum-active">0</span><span class="unit">명</span></div></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-icon mint"><i class="fas fa-calendar-day"></i></div>
+      <div class="summary-info"><div class="label">오늘 방문</div><div class="value"><span id="sum-today">0</span><span class="unit">명</span></div></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-icon purple"><i class="fas fa-door-open"></i></div>
+      <div class="summary-info"><div class="label">시설 이용</div><div class="value"><span id="sum-fac">0</span><span class="unit">건</span></div></div>
+    </div>
+    <div class="summary-card">
+      <div class="summary-icon pink"><i class="fas fa-hourglass-half"></i></div>
+      <div class="summary-info"><div class="label">대기자</div><div class="value"><span id="sum-wait">0</span><span class="unit">명</span></div></div>
+    </div>
+  </section>
+
+  <!-- 대기열 패널 -->
+  <section id="waitlist-panel" class="waitlist-panel" style="display:none;">
+    <h3 class="waitlist-panel-title"><i class="fas fa-list-ol"></i> 시설별 대기열 현황</h3>
+    <div id="waitlist-content" class="waitlist-content"></div>
+  </section>
+
+  <!-- ★ 시설별 이용현황 패널 -->
+  <section id="facility-status-panel" class="facility-status-panel">
+    <h3 class="fac-status-title"><i class="fas fa-th-large"></i> 시설별 이용현황</h3>
+    <div id="facility-status-grid" class="facility-status-grid"></div>
+  </section>
+
+  <!-- ★ 관리자 예약 현황 패널 -->
+  <section id="admin-reserve-panel" class="admin-reserve-panel">
+    <h3 class="admin-reserve-title"><i class="fas fa-user-shield"></i> 관리자 예약 현황</h3>
+    <div id="admin-reserve-list" class="admin-reserve-list"></div>
+  </section>
+
+  <!-- User Grid -->
+  <section class="user-grid" id="card-list">
+    <div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>데이터를 불러오는 중...</p></div>
+  </section>
+
+  <!-- ===== Stats Modal v3 (작년비교 + 보정 + 탭3개) ===== -->
+  <div id="stats-modal" class="modal-overlay">
+    <div class="modal-content stats-modal-wide">
+      <button class="modal-close" onclick="closeStats()">&times;</button>
+      <h2 class="modal-title">📊 통계 & 목표 관리</h2>
+
+      <!-- ★ v9.3: 월 변경만으로는 자동 조회되지 않음. '조회' 버튼을 눌러야 갱신됨 (egress 절감) -->
+      <div class="stats-controls" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <input type="month" id="stats-month" class="form-input">
+        <button class="goal-edit-btn" onclick="Service.clearStatsCache(); onStatsMonthChange();" style="background:#4F7BF7; white-space:nowrap;">
+          <i class="fas fa-search"></i> 조회
+        </button>
+      </div>
+
+      <!-- ★ 연간 목표 진행률 -->
+      <div id="yearly-progress-section" class="yearly-progress-section">
+        <div class="yearly-progress-header">
+          <span class="yearly-progress-title">🎯 <span id="goal-year-label">2026</span>년 연간 목표</span>
+          <div style="display:flex;gap:6px;">
+            <button class="goal-edit-btn" onclick="openPrevYearInput()" style="background:#FF9800;"><i class="fas fa-history"></i> 작년 실적</button>
+            <button class="goal-edit-btn" onclick="openGoalSetting()"><i class="fas fa-cog"></i> 목표 설정</button>
+          </div>
+        </div>
+        <div class="yearly-progress-bar-wrap">
+          <div class="yearly-progress-bar">
+            <div class="yearly-progress-fill" id="goal-fill" style="width:0%"></div>
+          </div>
+          <div class="yearly-progress-info">
+            <span class="yearly-progress-nums"><strong id="goal-current">0</strong> / <span id="goal-target">0</span> 명</span>
+            <span class="yearly-progress-pct" id="goal-pct">0%</span>
+          </div>
+        </div>
+        <!-- 월별 미니 바 차트 (올해 vs 작년) -->
+        <div class="yearly-month-bars" id="yearly-month-bars"></div>
+        <div id="prev-year-legend" class="prev-year-legend" style="display:none;">
+          <span class="legend-item"><span class="legend-dot current"></span> 올해</span>
+          <span class="legend-item"><span class="legend-dot prev"></span> 작년</span>
+        </div>
+      </div>
+
+      <!-- 탭 네비게이션 -->
+      <div class="stats-tabs">
+        <button class="stats-tab active" data-tab="summary" onclick="switchStatsTab('summary')">
+          <i class="fas fa-chart-pie"></i> 월간 요약
+        </button>
+        <button class="stats-tab" data-tab="daily" onclick="switchStatsTab('daily')">
+          <i class="fas fa-calendar-alt"></i> 일별 현황
+        </button>
+      </div>
+
+      <!-- ★ v12f: 올해 전체 이용실적 요약 -->
+      <div id="yearly-summary-section" style="margin:12px 0;padding:14px 16px;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border-radius:12px;border:1px solid #C7D2FE;display:none;">
+        <div style="font-size:0.85rem;font-weight:800;color:#4338CA;margin-bottom:10px;">📅 <span id="yearly-sum-label">2026</span>년 전체 이용실적</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;">
+          <div style="text-align:center;padding:8px;background:#fff;border-radius:8px;border:1px solid #E0E7FF;">
+            <div style="font-size:0.7rem;color:#6B7280;font-weight:600;">총 방문</div>
+            <div style="font-size:1.3rem;font-weight:900;color:#4338CA;" id="ys-total">-</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:#fff;border-radius:8px;border:1px solid #E0E7FF;">
+            <div style="font-size:0.7rem;color:#6B7280;font-weight:600;">운영 일수</div>
+            <div style="font-size:1.3rem;font-weight:900;color:#7C3AED;" id="ys-days">-</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:#fff;border-radius:8px;border:1px solid #E0E7FF;">
+            <div style="font-size:0.7rem;color:#6B7280;font-weight:600;">일평균</div>
+            <div style="font-size:1.3rem;font-weight:900;color:#059669;" id="ys-avg">-</div>
+          </div>
+          <div style="text-align:center;padding:8px;background:#fff;border-radius:8px;border:1px solid #E0E7FF;">
+            <div style="font-size:0.7rem;color:#6B7280;font-weight:600;">월평균</div>
+            <div style="font-size:1.3rem;font-weight:900;color:#D97706;" id="ys-mavg">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 탭1: 월간 요약 -->
+      <div id="tab-summary" class="stats-tab-content active">
+        <!-- 작년 비교 배너 -->
+        <div id="prev-year-compare" class="prev-compare-banner" style="display:none;"></div>
+        <div class="stats-grid">
+          <div class="stats-item highlight"><span class="s-label">총 방문 인원</span><b class="s-value"><span id="s-total">0</span> 명</b></div>
+          <div class="stats-item highlight" style="background: linear-gradient(135deg, #F3EFFF, #fff); border-color: var(--accent-purple);"><span class="s-label">운영 일수</span><b class="s-value" style="color: var(--accent-purple);"><span id="s-days">0</span> 일</b></div>
+          <div class="stats-item male"><span class="s-label">👦 남 초등</span><b class="s-value" id="sm-ele">0</b></div>
+          <div class="stats-item female"><span class="s-label">👧 여 초등</span><b class="s-value" id="sf-ele">0</b></div>
+          <div class="stats-item male"><span class="s-label">👦 남 중등</span><b class="s-value" id="sm-mid">0</b></div>
+          <div class="stats-item female"><span class="s-label">👧 여 중등</span><b class="s-value" id="sf-mid">0</b></div>
+          <div class="stats-item male"><span class="s-label">👦 남 고등</span><b class="s-value" id="sm-high">0</b></div>
+          <div class="stats-item female"><span class="s-label">👧 여 고등</span><b class="s-value" id="sf-high">0</b></div>
+          <div class="stats-item male"><span class="s-label">🧑 남 후기청소년</span><b class="s-value" id="sm-youth">0</b></div>
+          <div class="stats-item female"><span class="s-label">👩 여 후기청소년</span><b class="s-value" id="sf-youth">0</b></div>
+          <div class="stats-item male"><span class="s-label">🧑 남 성인</span><b class="s-value" id="sm-adult">0</b></div>
+          <div class="stats-item female"><span class="s-label">👩 여 성인</span><b class="s-value" id="sf-adult">0</b></div>
+          <div class="stats-item" style="grid-column: 1/-1; background: var(--accent-purple-light); border-color: var(--accent-purple);"><span class="s-label">👥 단체 방문 총 인원</span><b class="s-value" style="color: var(--accent-purple);"><span id="s-group">0</span> 명</b></div>
+        </div>
+      </div>
+
+      <!-- 탭2: 일별 현황 -->
+      <div id="tab-daily" class="stats-tab-content">
+        <div class="daily-toolbar">
+          <span class="daily-toolbar-info"><i class="fas fa-info-circle"></i> 행을 클릭하면 보정값을 편집할 수 있습니다</span>
+          <div style="display:flex;gap:6px;">
+            <button class="goal-edit-btn" onclick="openManualDayInput()" style="background:#FF9800;"><i class="fas fa-plus-circle"></i> 수동 입력</button>
+            <button class="adj-history-btn" onclick="openAdjHistory()"><i class="fas fa-history"></i> 보정 내역</button>
+          </div>
+        </div>
+        <div class="daily-table-wrap">
+          <table class="daily-table">
+            <thead>
+              <tr>
+                <th>날짜</th>
+                <th>합계</th>
+                <th>남초</th>
+                <th>여초</th>
+                <th>남중</th>
+                <th>여중</th>
+                <th>남고</th>
+                <th>여고</th>
+                <th>남후청</th>
+                <th>여후청</th>
+                <th>남성인</th>
+                <th>여성인</th>
+                <th>단체</th>
+                <th>작년</th>
+              </tr>
+            </thead>
+            <tbody id="daily-table-body">
+              <tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:30px;">데이터를 불러오는 중...</td></tr>
+            </tbody>
+            <tfoot id="daily-table-foot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="js/api.js?v=20260904a"></script>
+  <script src="js/gs-sync.js?v=20260904a"></script>
+  <script src="js/admin.js?v=20260904a"></script>
+</body>
+</html>

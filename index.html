@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>오정센터 청소년카페 키오스크</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- ★ 캐시 방지 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css?v=20260904a">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body class="kiosk-body">
+
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p class="loading-text">처리 중입니다...</p>
+  </div>
+
+  <main class="kiosk-container">
+    <!-- LEFT : Brand -->
+    <aside class="kiosk-left">
+      <div class="brand-mascot">
+        <img src="images/maeum-i.png" alt="마음이 캐릭터" class="mascot-img">
+      </div>
+      <h1 class="brand-title">마음 휴카페</h1>
+      <p class="brand-subtitle">오정센터 청소년카페<br>편안하게 쉬다 가세요 💜</p>
+    </aside>
+
+    <!-- RIGHT : Kiosk -->
+    <section class="kiosk-right">
+      <div class="date-time">
+        <span id="datetime-display">로딩중...</span>
+        <span class="header-links">
+          <a href="#" class="admin-link" onclick="event.preventDefault(); authAndGo('members.html')"><i class="fas fa-users-cog"></i> 이용자관리</a>
+          <a href="#" class="admin-link" onclick="event.preventDefault(); authAndGo('admin.html')"><i class="fas fa-user-shield"></i> 관리자</a>
+        </span>
+      </div>
+
+      <!-- Step 1. 전화번호 입력 -->
+      <section id="view-entry" class="view-section active">
+        <h2 class="section-title">어서오세요! 👋</h2>
+        <p class="section-subtitle">전화번호를 입력해주세요</p>
+        <input type="text" id="display" class="phone-display" readonly placeholder="전화번호를 입력하세요" maxlength="13">
+        <div class="keypad">
+          <button class="key" onclick="addVal('1')">1</button>
+          <button class="key" onclick="addVal('2')">2</button>
+          <button class="key" onclick="addVal('3')">3</button>
+          <button class="key" onclick="addVal('4')">4</button>
+          <button class="key" onclick="addVal('5')">5</button>
+          <button class="key" onclick="addVal('6')">6</button>
+          <button class="key" onclick="addVal('7')">7</button>
+          <button class="key" onclick="addVal('8')">8</button>
+          <button class="key" onclick="addVal('9')">9</button>
+          <button class="key" onclick="addVal('010')" style="font-size:1rem;">010</button>
+          <button class="key" onclick="addVal('0')">0</button>
+          <button class="key" onclick="clearLast()"><i class="fas fa-backspace"></i></button>
+        </div>
+        <button class="btn btn-primary btn-lg btn-block" style="margin-top:10px;" onclick="submitSearch()">
+          <i class="fas fa-door-open"></i> 입장 / 조회
+        </button>
+      </section>
+
+      <!-- Step 2. 입장 / 놀거리 선택 -->
+      <section id="view-choice" class="view-section">
+        <h2 class="welcome-title"><span class="name" id="user-welcome-choice">고객</span>님,<br>환영합니다! 💜</h2>
+        <div class="choice-buttons">
+          <button class="choice-btn choice-enter" onclick="handleChoiceEnter()">
+            <div class="choice-icon"><i class="fas fa-mug-hot"></i></div>
+            <p class="choice-title">입장</p>
+            <p class="choice-desc">휴카페 이용</p>
+          </button>
+          <button class="choice-btn choice-play" onclick="handleChoicePlay()">
+            <div class="choice-icon"><i class="fas fa-gamepad"></i></div>
+            <p class="choice-title">놀거리 예약</p>
+            <p class="choice-desc">공간 · 시설 이용하기</p>
+          </button>
+        </div>
+      </section>
+
+      <!-- Step 3. 메인 메뉴 (놀거리 예약 선택 시) -->
+      <section id="view-main" class="view-section">
+        <h2 class="welcome-title"><span class="name" id="user-welcome">고객</span>님,<br>무엇을 도와드릴까요?</h2>
+        <div class="menu-list">
+          <button class="menu-item primary" onclick="showView('view-facilities')">
+            <div class="menu-icon"><i class="fas fa-couch"></i></div>
+            <div class="menu-text">
+              <p class="menu-title">공간 이용하기</p>
+              <p class="menu-desc">모임방 · 노래방 · 닌텐도 · 보드게임 등</p>
+            </div>
+            <i class="fas fa-chevron-right menu-arrow"></i>
+          </button>
+          <button class="menu-item purple" onclick="checkMyReservation()">
+            <div class="menu-icon"><i class="fas fa-calendar-check"></i></div>
+            <div class="menu-text">
+              <p class="menu-title">내 예약 내역</p>
+              <p class="menu-desc">현재 이용 중인 시설 확인</p>
+            </div>
+            <i class="fas fa-chevron-right menu-arrow"></i>
+          </button>
+          <button class="menu-item mint" onclick="checkMyUsage()">
+            <div class="menu-icon"><i class="fas fa-chart-line"></i></div>
+            <div class="menu-text">
+              <p class="menu-title">이용 횟수 확인</p>
+              <p class="menu-desc">이번 달 방문일수 조회</p>
+            </div>
+            <i class="fas fa-chevron-right menu-arrow"></i>
+          </button>
+          <button class="menu-item pink" onclick="showLoginInfo()">
+            <div class="menu-icon"><i class="fas fa-mobile-alt"></i></div>
+            <div class="menu-text">
+              <p class="menu-title">모바일 예약 안내</p>
+              <p class="menu-desc">휴대폰으로 예약하기</p>
+            </div>
+            <i class="fas fa-chevron-right menu-arrow"></i>
+          </button>
+        </div>
+        <div class="exit-btn-wrap">
+          <button class="btn btn-danger btn-lg btn-block" onclick="handleExit()">
+            <i class="fas fa-sign-out-alt"></i> 퇴장하기
+          </button>
+        </div>
+      </section>
+
+      <!-- Step 3. 시설 선택 -->
+      <section id="view-facilities" class="view-section">
+        <h2 class="section-title">공간 선택</h2>
+        <p class="section-subtitle">이용하실 공간을 선택하세요</p>
+        <div class="facility-grid" id="facility-grid"></div>
+        <button class="btn btn-ghost btn-block" onclick="showView('view-main')">
+          <i class="fas fa-arrow-left"></i> 뒤로가기
+        </button>
+      </section>
+
+      <!-- Step 4. 세부 선택 -->
+      <section id="view-sub" class="view-section">
+        <h2 class="section-title" id="sub-title">세부 선택</h2>
+        <p class="section-subtitle">원하시는 옵션을 선택해주세요</p>
+        <div id="sub-buttons" class="facility-grid"></div>
+        <button class="btn btn-ghost btn-block" onclick="showView('view-facilities')">
+          <i class="fas fa-arrow-left"></i> 뒤로가기
+        </button>
+      </section>
+    </section>
+  </main>
+
+  <!-- 회원가입 모달 -->
+  <div id="reg-modal" class="modal-overlay">
+    <div class="modal-content">
+      <button class="modal-close" onclick="closeRegModal()">&times;</button>
+      <h2 class="modal-title">✍️ 첫 방문 회원가입</h2>
+
+      <div class="tab-group">
+        <button id="type-private" class="tab-btn active" onclick="setRegType('개인')">개인</button>
+        <button id="type-group" class="tab-btn" onclick="setRegType('단체')">단체</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" id="name-label">이름</label>
+        <input type="text" id="reg-name" class="form-input" placeholder="이름을 입력하세요">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">전화번호</label>
+        <input type="text" id="reg-phone" class="form-input" readonly>
+      </div>
+
+      <!-- 단체 필드 -->
+      <div id="group-fields" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">단체명</label>
+          <input type="text" id="reg-group-name" class="form-input" placeholder="예: OO학교, OO단체">
+        </div>
+        <div class="form-group">
+          <label class="form-label">연령대별 인원</label>
+          <div id="group-members-container"></div>
+          <button type="button" class="add-row-btn" onclick="addGroupRow()">
+            <i class="fas fa-plus"></i> 연령대 추가
+          </button>
+        </div>
+      </div>
+
+      <!-- 개인 필드 -->
+      <div id="private-fields">
+        <div class="form-group">
+          <label class="form-label">생년월일</label>
+          <div class="birth-select-row">
+            <input type="number" id="reg-birth-year" class="form-input birth-input birth-year" placeholder="년도" min="1950" max="2025" inputmode="numeric" oninput="updateBirthValue()">
+            <select id="reg-birth-month" class="form-input birth-input birth-month" onchange="updateBirthValue()">
+              <option value="">월</option>
+              <option value="01">1월</option><option value="02">2월</option><option value="03">3월</option>
+              <option value="04">4월</option><option value="05">5월</option><option value="06">6월</option>
+              <option value="07">7월</option><option value="08">8월</option><option value="09">9월</option>
+              <option value="10">10월</option><option value="11">11월</option><option value="12">12월</option>
+            </select>
+            <select id="reg-birth-day" class="form-input birth-input birth-day" onchange="updateBirthValue()">
+              <option value="">일</option>
+            </select>
+          </div>
+          <input type="hidden" id="reg-birth" value="">
+        </div>
+        <div class="form-group">
+          <label class="form-label">성별</label>
+          <div class="gender-btns">
+            <button type="button" id="btn-male" class="gender-btn" onclick="setGender('남')">남성</button>
+            <button type="button" id="btn-female" class="gender-btn" onclick="setGender('여')">여성</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="login-info-box">
+        <i class="fas fa-info-circle"></i>
+        <span>가입 후 모바일 로그인: <strong>이름</strong> + <strong>전화번호 뒷 4자리</strong></span>
+      </div>
+
+      <div class="consent-box">
+        <label>
+          <input type="checkbox" id="reg-consent">
+          <span>[필수] 개인정보 수집·이용에 동의합니다<br><small style="opacity:0.7;">수집 항목: 이름, 전화번호, 생년월일, 성별 / 보관 목적: 시설 출입 및 이용 통계</small></span>
+        </label>
+      </div>
+
+      <button class="btn btn-primary btn-lg btn-block" onclick="executeRegister()">
+        🎉 가입 및 입장 완료
+      </button>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=20260904a"></script>
+  <script src="js/kiosk.js?v=20260904a"></script>
+</body>
+</html>

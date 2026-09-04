@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>오정센터 통계 현황</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ★ 캐시 방지 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css?v=20260904a">
+  <style>
+    body {
+      background: linear-gradient(135deg, #F5F7FC 0%, #EEF2FB 100%);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    .stats-page-header {
+      background: linear-gradient(135deg, var(--secondary) 0%, #1e3a6e 100%);
+      color: #fff;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-md);
+    }
+    .stats-page-header h1 {
+      font-size: 1.2rem;
+      font-weight: 900;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stats-header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .stats-header-controls input[type="month"] {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 2px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+    .stats-header-controls input[type="month"]::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+    }
+    .header-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .header-btn.refresh {
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+    .header-btn.refresh:hover { background: rgba(255,255,255,0.35); }
+    .header-btn.back {
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      text-decoration: none;
+    }
+    .header-btn.back:hover { background: rgba(255,255,255,0.3); }
+
+    .auto-refresh-badge {
+      font-size: 0.7rem;
+      background: rgba(255, 193, 7, 0.25);
+      color: #FDE68A;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .stats-page-content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+
+    /* 요약 카드 그리드 */
+    .stats-summary-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stats-summary-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      padding: 20px 16px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-light);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .stats-summary-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .stats-summary-card .card-icon {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+    }
+    .stats-summary-card .card-label {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .stats-summary-card .card-value {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: var(--primary);
+    }
+    .stats-summary-card .card-value.pink { color: var(--accent-pink); }
+    .stats-summary-card .card-value.purple { color: var(--accent-purple); }
+    .stats-summary-card .card-value.mint { color: var(--accent-mint); }
+
+    /* 연간 목표 섹션 — 독립 페이지에서 스타일 재활용 */
+    .section-card {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border-light);
+    }
+    .section-title {
+      font-size: 1rem;
+      font-weight: 900;
+      color: var(--secondary);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 성별/학년 그리드 */
+    .gender-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+    }
+    .gender-item {
+      padding: 12px 8px;
+      border-radius: var(--radius-sm);
+      text-align: center;
+      border: 1px solid var(--border-light);
+    }
+    .gender-item.male { background: #F5F9FF; }
+    .gender-item.female { background: #FFF5F9; }
+    .gender-item .g-label {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      display: block;
+      margin-bottom: 4px;
+    }
+    .gender-item .g-value {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--secondary);
+    }
+
+    /* 일별 테이블 외부에서 표시 */
+    .daily-table-section .daily-table-wrap {
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    /* 업데이트 시각 */
+    .last-updated {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      padding: 16px 0;
+    }
+
+    /* 모바일 대응 */
+    @media (max-width: 600px) {
+      .stats-page-header { padding: 14px 12px; }
+      .stats-page-header h1 { font-size: 1rem; }
+      .stats-page-content { padding: 16px 10px 40px; }
+      .stats-summary-cards { grid-template-columns: repeat(2, 1fr); }
+      .gender-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="stats-page-header">
+    <h1>📊 오정센터 통계 현황</h1>
+    <div class="stats-header-controls">
+      <input type="month" id="stats-month">
+      <button class="header-btn refresh" onclick="refreshAll()">
+        <i class="fas fa-search"></i> 조회
+      </button>
+      <span class="auto-refresh-badge">
+        <i class="fas fa-hand-pointer"></i> 수동 조회
+      </span>
+      <a class="header-btn back" href="admin.html">
+        <i class="fas fa-arrow-left"></i> 관리자
+      </a>
+    </div>
+  </header>
+
+  <main class="stats-page-content">
+
+    <!-- 요약 카드 -->
+    <section class="stats-summary-cards">
+      <div class="stats-summary-card">
+        <div class="card-icon">👥</div>
+        <div class="card-label">월 총 방문</div>
+        <div class="card-value" id="sp-total">-</div>
+      </div>
+      <div class="stats-summary-card">
+        <div class="card-icon">📅</div>
+        <div class="card-label">운영 일수</div>
+        <div class="card-value purple" id="sp-days">-</div>
+      </div>
+      <div class="stats-summary-card">
+        <div class="card-icon">👨‍👩‍👧‍👦</div>
+        <div class="card-label">단체 방문</div>
+        <div class="card-value pink" id="sp-group">-</div>
+      </div>
+      <div class="stats-summary-card">
+        <div class="card-icon">📈</div>
+        <div class="card-label">일평균</div>
+        <div class="card-value mint" id="sp-avg">-</div>
+      </div>
+    </section>
+
+    <!-- 작년 비교 배너 -->
+    <div id="prev-year-compare" class="prev-compare-banner" style="display:none;"></div>
+
+    <!-- 연간 목표 진행률 -->
+    <section class="section-card">
+      <div class="yearly-progress-header">
+        <span class="yearly-progress-title">🎯 <span id="goal-year-label">2026</span>년 연간 목표</span>
+      </div>
+      <div class="yearly-progress-bar-wrap">
+        <div class="yearly-progress-bar">
+          <div class="yearly-progress-fill" id="goal-fill" style="width:0%"></div>
+        </div>
+        <div class="yearly-progress-info">
+          <span class="yearly-progress-nums"><strong id="goal-current">0</strong> / <span id="goal-target">0</span> 명</span>
+          <span class="yearly-progress-pct" id="goal-pct">0%</span>
+        </div>
+      </div>
+      <div class="yearly-month-bars" id="yearly-month-bars"></div>
+      <div id="prev-year-legend" class="prev-year-legend" style="display:none;">
+        <span class="legend-item"><span class="legend-dot current"></span> 올해</span>
+        <span class="legend-item"><span class="legend-dot prev"></span> 작년</span>
+      </div>
+    </section>
+
+    <!-- ★ v12f: 올해 전체 이용실적 -->
+    <section id="sp-yearly-summary" class="section-card" style="display:none;background:linear-gradient(135deg,#EEF2FF,#F5F3FF);border-color:#C7D2FE;">
+      <div class="section-title" style="color:#4338CA;">📅 <span id="sp-ys-label">2026</span>년 전체 이용실적</div>
+      <div class="stats-summary-cards" style="margin-bottom:0;">
+        <div class="stats-summary-card">
+          <div class="card-icon">🏆</div>
+          <div class="card-label">연간 총 방문</div>
+          <div class="card-value" id="sp-ys-total" style="color:#4338CA;">-</div>
+        </div>
+        <div class="stats-summary-card">
+          <div class="card-icon">📆</div>
+          <div class="card-label">운영 개월</div>
+          <div class="card-value purple" id="sp-ys-months">-</div>
+        </div>
+        <div class="stats-summary-card">
+          <div class="card-icon">📊</div>
+          <div class="card-label">월평균</div>
+          <div class="card-value pink" id="sp-ys-mavg">-</div>
+        </div>
+        <div class="stats-summary-card">
+          <div class="card-icon">📈</div>
+          <div class="card-label">일평균 (추정)</div>
+          <div class="card-value mint" id="sp-ys-davg">-</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 성별/학년별 현황 -->
+    <section class="section-card">
+      <div class="section-title"><i class="fas fa-chart-pie"></i> 성별·학년별 현황</div>
+      <div class="gender-grid">
+        <div class="gender-item male"><span class="g-label">👦 남 초등</span><span class="g-value" id="sp-m-ele">0</span></div>
+        <div class="gender-item female"><span class="g-label">👧 여 초등</span><span class="g-value" id="sp-f-ele">0</span></div>
+        <div class="gender-item male"><span class="g-label">👦 남 중등</span><span class="g-value" id="sp-m-mid">0</span></div>
+        <div class="gender-item female"><span class="g-label">👧 여 중등</span><span class="g-value" id="sp-f-mid">0</span></div>
+        <div class="gender-item male"><span class="g-label">👦 남 고등</span><span class="g-value" id="sp-m-high">0</span></div>
+        <div class="gender-item female"><span class="g-label">👧 여 고등</span><span class="g-value" id="sp-f-high">0</span></div>
+        <div class="gender-item male"><span class="g-label">🧑 남 후기청소년</span><span class="g-value" id="sp-m-youth">0</span></div>
+        <div class="gender-item female"><span class="g-label">👩 여 후기청소년</span><span class="g-value" id="sp-f-youth">0</span></div>
+        <div class="gender-item male"><span class="g-label">🧑 남 성인</span><span class="g-value" id="sp-m-adult">0</span></div>
+        <div class="gender-item female"><span class="g-label">👩 여 성인</span><span class="g-value" id="sp-f-adult">0</span></div>
+      </div>
+    </section>
+
+    <!-- 일별 현황 테이블 -->
+    <section class="section-card daily-table-section">
+      <div class="section-title"><i class="fas fa-calendar-alt"></i> 일별 현황</div>
+      <div class="daily-table-wrap">
+        <table class="daily-table">
+          <thead>
+            <tr>
+              <th>날짜</th><th>합계</th>
+              <th>남초</th><th>여초</th><th>남중</th><th>여중</th>
+              <th>남고</th><th>여고</th><th>남후청</th><th>여후청</th>
+              <th>남성인</th><th>여성인</th>
+              <th>단체</th><th>작년</th>
+            </tr>
+          </thead>
+          <tbody id="daily-table-body">
+            <tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:30px;">데이터를 불러오는 중...</td></tr>
+          </tbody>
+          <tfoot id="daily-table-foot"></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <div class="last-updated">
+      마지막 업데이트: <span id="last-updated-time">-</span>
+    </div>
+
+  </main>
+
+  <script src="js/api.js?v=20260904a"></script>
+  <script>
+    // ===== 독립 통계 페이지 로직 (★ v9.3: 수동 조회 모드 — egress 절감) =====
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('stats-month').value = Util.thisMonth();
+      loadAllStats(); // 페이지 로드 시 1회만 자동 조회
+    });
+
+    function refreshAll() {
+      Service.clearStatsCache();
+      loadAllStats();
+    }
+
+    async function loadAllStats() {
+      const m = document.getElementById('stats-month').value;
+      if (!m) return;
+      Service.clearStatsCache();
+      try {
+        await Promise.all([
+          loadMonthlySummary(m),
+          loadDailyBreakdown(m),
+          loadYearlyProgress(m)
+        ]);
+      } catch (e) {
+        console.error('통계 로딩 오류:', e);
+      }
+      document.getElementById('last-updated-time').textContent =
+        new Date().toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ===== 월간 요약 =====
+    async function loadMonthlySummary(m) {
+      const s = await Service.getMonthlyStatsWithAdj(m);
+
+      document.getElementById('sp-total').textContent = (s.total || 0).toLocaleString();
+      document.getElementById('sp-days').textContent = s.visit_days || 0;
+      document.getElementById('sp-group').textContent = (s.group_total || 0).toLocaleString();
+      const avg = s.visit_days > 0 ? Math.round(s.total / s.visit_days) : 0;
+      document.getElementById('sp-avg').textContent = avg.toLocaleString();
+
+      const mapping = {
+        'sp-m-ele': 'm_ele', 'sp-f-ele': 'f_ele',
+        'sp-m-mid': 'm_mid', 'sp-f-mid': 'f_mid',
+        'sp-m-high': 'm_high', 'sp-f-high': 'f_high',
+        'sp-m-youth': 'm_youth', 'sp-f-youth': 'f_youth',
+        'sp-m-adult': 'm_adult', 'sp-f-adult': 'f_adult'
+      };
+      for (const [elId, key] of Object.entries(mapping)) {
+        document.getElementById(elId).textContent = (s[key] || 0) + '명';
+      }
+
+      // 작년 비교 배너
+      const prevYear = String(parseInt(m.slice(0,4)) - 1);
+      const prevMonth = m.slice(5, 7);
+      const prevData = await Service.getPrevYearMonthly(prevYear);
+      const prevMonthData = prevData[prevMonth];
+      const banner = document.getElementById('prev-year-compare');
+
+      if (prevMonthData && parseInt(prevMonthData.total) > 0) {
+        const prevTotal = parseInt(prevMonthData.total) || 0;
+        const diff = (s.total || 0) - prevTotal;
+        const pct = prevTotal > 0 ? Math.round(((s.total || 0) / prevTotal) * 100) : 0;
+        const arrow = diff > 0 ? '📈' : (diff < 0 ? '📉' : '➡️');
+        const diffColor = diff > 0 ? '#10B981' : (diff < 0 ? '#EF4444' : '#6B7280');
+        const diffSign = diff > 0 ? '+' : '';
+        banner.innerHTML = `
+          <div class="prev-compare-content">
+            <span class="prev-compare-label">${arrow} 작년 ${parseInt(prevMonth)}월 대비</span>
+            <span class="prev-compare-values">
+              작년 <strong>${prevTotal}명</strong> → 올해 <strong>${s.total || 0}명</strong>
+              <span style="color:${diffColor};font-weight:900;margin-left:8px;">(${diffSign}${diff}명, ${pct}%)</span>
+            </span>
+          </div>`;
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    // ===== 일별 현황 =====
+    async function loadDailyBreakdown(m) {
+      const rows = await Service.getDailyBreakdownWithAdj(m);
+      const tbody = document.getElementById('daily-table-body');
+      const tfoot = document.getElementById('daily-table-foot');
+
+      const prevYear = String(parseInt(m.slice(0,4)) - 1);
+      const prevMonth = m.slice(5, 7);
+      const prevData = await Service.getPrevYearMonthly(prevYear);
+      const prevMonthData = prevData[prevMonth];
+      const prevTotal = prevMonthData ? (parseInt(prevMonthData.total) || 0) : 0;
+
+      if (!rows || rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:30px;">해당 월 데이터가 없습니다</td></tr>';
+        tfoot.innerHTML = '';
+        return;
+      }
+
+      const totals = { total: 0, m_ele: 0, f_ele: 0, m_mid: 0, f_mid: 0, m_high: 0, f_high: 0, m_youth: 0, f_youth: 0, m_adult: 0, f_adult: 0, group_total: 0 };
+
+      tbody.innerHTML = rows.map(r => {
+        const dayNum = r.date.slice(8, 10);
+        const dow = ['일','월','화','수','목','금','토'][new Date(r.date).getDay()];
+        const dowClass = dow === '일' ? ' sun' : (dow === '토' ? ' sat' : '');
+        const adjClass = r._hasAdj ? ' has-adj' : '';
+        Object.keys(totals).forEach(k => { totals[k] += (r[k] || 0); });
+        const v = (val) => val ? val : '-';
+
+        return `<tr class="daily-row${adjClass}">
+          <td class="${dowClass}">${parseInt(dayNum)}일(${dow})${r._hasAdj ? ' <i class="fas fa-pen" style="font-size:0.6rem;color:var(--accent-purple);"></i>' : ''}</td>
+          <td class="total-col"><strong>${r.total}</strong></td>
+          <td>${v(r.m_ele)}</td><td>${v(r.f_ele)}</td>
+          <td>${v(r.m_mid)}</td><td>${v(r.f_mid)}</td>
+          <td>${v(r.m_high)}</td><td>${v(r.f_high)}</td>
+          <td>${v(r.m_youth)}</td><td>${v(r.f_youth)}</td>
+          <td>${v(r.m_adult)}</td><td>${v(r.f_adult)}</td>
+          <td>${v(r.group_total)}</td>
+          <td class="prev-col">${prevTotal > 0 ? Math.round(prevTotal / rows.length) : '-'}</td>
+        </tr>`;
+      }).join('');
+
+      tfoot.innerHTML = `<tr class="daily-total-row">
+        <td><strong>합계</strong></td>
+        <td class="total-col"><strong>${totals.total}</strong></td>
+        <td><strong>${totals.m_ele || '-'}</strong></td><td><strong>${totals.f_ele || '-'}</strong></td>
+        <td><strong>${totals.m_mid || '-'}</strong></td><td><strong>${totals.f_mid || '-'}</strong></td>
+        <td><strong>${totals.m_high || '-'}</strong></td><td><strong>${totals.f_high || '-'}</strong></td>
+        <td><strong>${totals.m_youth || '-'}</strong></td><td><strong>${totals.f_youth || '-'}</strong></td>
+        <td><strong>${totals.m_adult || '-'}</strong></td><td><strong>${totals.f_adult || '-'}</strong></td>
+        <td><strong>${totals.group_total || '-'}</strong></td>
+        <td class="prev-col"><strong>${prevTotal || '-'}</strong></td>
+      </tr>`;
+    }
+
+    // ===== 연간 목표 진행률 =====
+    async function loadYearlyProgress(m) {
+      const year = m.slice(0, 4);
+      const prevYear = String(parseInt(year) - 1);
+
+      document.getElementById('goal-year-label').textContent = year;
+      const goal = await Service.getYearlyGoal(year);
+      const { total, monthTotals } = await Service.getYearlyTotal(year);
+
+      const prevYearData = await Service.getPrevYearTotal(prevYear);
+      const hasPrev = prevYearData.total > 0;
+
+      document.getElementById('goal-current').textContent = total.toLocaleString();
+      document.getElementById('goal-target').textContent = goal > 0 ? goal.toLocaleString() : '미설정';
+
+      let pct = 0;
+      if (goal > 0) pct = Math.min(Math.round((total / goal) * 100), 100);
+      document.getElementById('goal-pct').textContent = goal > 0 ? pct + '%' : '-';
+
+      const fill = document.getElementById('goal-fill');
+      fill.style.width = (goal > 0 ? pct : 0) + '%';
+      fill.className = 'yearly-progress-fill';
+      if (pct >= 100) fill.classList.add('complete');
+      else if (pct >= 70) fill.classList.add('good');
+      else if (pct >= 40) fill.classList.add('mid');
+
+      // 월별 미니 바
+      const barsEl = document.getElementById('yearly-month-bars');
+      const months = [];
+      for (let i = 1; i <= 12; i++) {
+        const mk = `${year}-${String(i).padStart(2, '0')}`;
+        const pmk = `${prevYear}-${String(i).padStart(2, '0')}`;
+        months.push({
+          label: `${i}월`,
+          value: monthTotals[mk] || 0,
+          prev: prevYearData.monthTotals[pmk] || 0
+        });
+      }
+      const maxVal = Math.max(...months.map(x => Math.max(x.value, x.prev)), 1);
+
+      barsEl.innerHTML = months.map(mon => {
+        const barH = Math.max(Math.round((mon.value / maxVal) * 100), mon.value > 0 ? 6 : 0);
+        const prevH = hasPrev ? Math.max(Math.round((mon.prev / maxVal) * 100), mon.prev > 0 ? 6 : 0) : 0;
+        return `<div class="month-bar-col">
+          <div class="month-bar-val">${mon.value > 0 ? mon.value : ''}</div>
+          <div class="month-bar-track">
+            ${hasPrev ? `<div class="month-bar-fill prev" style="height:${prevH}%"></div>` : ''}
+            <div class="month-bar-fill current" style="height:${barH}%"></div>
+          </div>
+          <div class="month-bar-label">${mon.label}</div>
+        </div>`;
+      }).join('');
+
+      document.getElementById('prev-year-legend').style.display = hasPrev ? 'flex' : 'none';
+
+      // ★ v12f: 올해 전체 이용실적 요약
+      const ysSec = document.getElementById('sp-yearly-summary');
+      if (ysSec) {
+        document.getElementById('sp-ys-label').textContent = year;
+        const activeMonths = Object.values(monthTotals).filter(v => v > 0).length;
+        const monthCount = activeMonths || 1;
+        const monthAvg = Math.round(total / monthCount);
+        const estDays = activeMonths * 22;
+        const dayAvg = estDays > 0 ? Math.round(total / estDays) : 0;
+        document.getElementById('sp-ys-total').textContent = total.toLocaleString();
+        document.getElementById('sp-ys-months').textContent = activeMonths > 0 ? activeMonths + '개월' : '-';
+        document.getElementById('sp-ys-mavg').textContent = monthAvg > 0 ? monthAvg.toLocaleString() : '-';
+        document.getElementById('sp-ys-davg').textContent = dayAvg > 0 ? dayAvg.toLocaleString() : '-';
+        ysSec.style.display = total > 0 ? 'block' : 'none';
+      }
+    }
+  </script>
+</body>
+</html>
