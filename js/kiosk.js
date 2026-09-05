@@ -394,7 +394,7 @@ async function buildFacilityGrid() {
 }
 
 // ===== 6. 시설 예약 =====
-async function doReserve(facility, detail = '') {
+async function doReserve(facility, detail = '', note = '') {
   if (!userData.phone) return Swal.fire({ title: '알림', text: '먼저 번호 조회로 입장해주세요.', icon: 'info' });
 
   // ★ 운영시간 체크 (관리자는 무시)
@@ -409,7 +409,7 @@ async function doReserve(facility, detail = '') {
 
   Util.showLoading(true);
   try {
-    const res = await Service.reserveFacility(userData.phone, userData.name, facility, detail);
+    const res = await Service.reserveFacility(userData.phone, userData.name, facility, detail, note);
     Util.showLoading(false);
 
     if (res.status === 'error') {
@@ -429,6 +429,23 @@ async function doReserve(facility, detail = '') {
     Util.showLoading(false);
     Swal.fire({ title: '오류', text: '예약 중 오류가 발생했습니다.', icon: 'error' });
   }
+}
+
+// ★ 관리자 전용 타임슬롯(댄스연습실/멀티룸) 예약 시 예약자명/용도 입력받기
+async function adminReserveWithNote(facility, slot) {
+  const { value: note } = await Swal.fire({
+    title: `${facility} 예약`,
+    html: `<p style="margin-bottom:8px;color:#6B7280;font-size:0.9rem;"><strong>${slot}</strong></p>`,
+    input: 'text',
+    inputPlaceholder: '예: 홍길동 외 3명',
+    inputLabel: '예약자명 / 인원',
+    confirmButtonText: '<i class="fas fa-check"></i> 예약',
+    cancelButtonText: '취소',
+    confirmButtonColor: '#4F7BF7',
+    showCancelButton: true
+  });
+  if (note === undefined) return; // 취소
+  doReserve(facility, slot, (note || '').trim());
 }
 
 // 대기 등록 (키오스크)
@@ -621,7 +638,8 @@ async function showAdminTimeMenu(facility) {
         btn.onclick = () => Swal.fire({ title: '알림', text: '이미 예약된 시간입니다.', icon: 'info' });
       } else {
         // 관리자는 사용 중이어도 예약 가능 (다른 사람 이름으로)
-        btn.onclick = () => doReserve(facility, slot);
+        // ★ 예약자명/용도를 입력받아 note로 저장 → admin.html 시간표에 표시
+        btn.onclick = () => adminReserveWithNote(facility, slot);
       }
       container.appendChild(btn);
     });
