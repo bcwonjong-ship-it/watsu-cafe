@@ -169,6 +169,9 @@ function renderMembers() {
             </div>
             <div class="member-phone"><i class="fas fa-phone-alt"></i> ${Util.formatPhone(m.phone)}</div>
           </div>
+          <button class="member-barcode-btn" data-barcode-phone="${escapeHtml(m.phone)}" data-barcode-name="${escapeHtml(m.name)}" title="바코드 보기/인쇄">
+            <i class="fas fa-barcode"></i>
+          </button>
           <button class="member-edit-btn" data-edit-id="${m.id}">
             <i class="fas fa-pen"></i>
           </button>
@@ -193,6 +196,49 @@ function renderMembers() {
       const mid = btn.dataset.editId;
       if (mid) openEditModal(mid);
     });
+  });
+  list.querySelectorAll('.member-barcode-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showMemberBarcode(btn.dataset.barcodePhone, btn.dataset.barcodeName);
+    });
+  });
+}
+
+// ===== ★ 회원 바코드 (전화번호 기반) — 키오스크 바코드 스캐너 입장용 =====
+function showMemberBarcode(phone, name) {
+  const cleanP = Util.cleanPhone(phone);
+  Swal.fire({
+    title: `🏷️ ${escapeHtml(name)}님 회원 바코드`,
+    html: `
+      <p style="color:#6B7280;font-size:0.85rem;margin-bottom:12px;">키오스크에서 이 바코드를 스캔하면 자동 입장됩니다.</p>
+      <div style="background:#fff;padding:16px;border-radius:8px;display:inline-block;">
+        <svg id="member-barcode-svg"></svg>
+      </div>
+      <p style="margin-top:8px;font-weight:700;letter-spacing:1px;">${Util.formatPhone(cleanP)}</p>
+    `,
+    confirmButtonText: '<i class="fas fa-print"></i> 인쇄',
+    showCancelButton: true,
+    cancelButtonText: '닫기',
+    confirmButtonColor: '#4F7BF7',
+    didOpen: () => {
+      JsBarcode('#member-barcode-svg', cleanP, { format: 'CODE128', width: 2, height: 60, displayValue: false });
+    },
+    preConfirm: () => {
+      const svg = document.getElementById('member-barcode-svg');
+      const win = window.open('', '_blank', 'width=400,height=300');
+      win.document.write(`
+        <html><head><title>회원 바코드 - ${escapeHtml(name)}</title></head>
+        <body style="text-align:center;font-family:sans-serif;padding:40px;">
+          <h3>${escapeHtml(name)}</h3>
+          ${svg.outerHTML}
+          <p style="font-weight:bold;letter-spacing:2px;">${Util.formatPhone(cleanP)}</p>
+          <script>window.onload = () => { window.print(); }</script>
+        </body></html>
+      `);
+      win.document.close();
+      return false; // Swal 닫지 않음
+    }
   });
 }
 

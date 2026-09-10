@@ -11,8 +11,10 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260910d">
+  <link rel="stylesheet" href="css/style.css?v=20260910e">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 </head>
 <body class="kiosk-body">
 
@@ -62,6 +64,9 @@
         </div>
         <button class="btn btn-primary btn-lg btn-block" style="margin-top:10px;" onclick="submitSearch()">
           <i class="fas fa-door-open"></i> 입장 / 조회
+        </button>
+        <button class="btn btn-secondary btn-lg btn-block" style="margin-top:8px;" onclick="openCameraScan()">
+          <i class="fas fa-camera"></i> 카메라로 바코드 스캔
         </button>
       </section>
 
@@ -118,6 +123,14 @@
             </div>
             <i class="fas fa-chevron-right menu-arrow"></i>
           </button>
+          <button class="menu-item amber" onclick="showMyBarcodeKiosk()">
+            <div class="menu-icon"><i class="fas fa-barcode"></i></div>
+            <div class="menu-text">
+              <p class="menu-title">내 바코드 보기</p>
+              <p class="menu-desc">다음에 스캔으로 빠르게 입장하기</p>
+            </div>
+            <i class="fas fa-chevron-right menu-arrow"></i>
+          </button>
         </div>
         <div class="exit-btn-wrap">
           <button class="btn btn-danger btn-lg btn-block" onclick="handleExit()">
@@ -147,6 +160,25 @@
       </section>
     </section>
   </main>
+
+  <!-- ★ 카메라 바코드 스캔 모달 -->
+  <div id="camera-scan-modal" class="modal-overlay">
+    <div class="modal-content" style="text-align:center;">
+      <button class="modal-close" onclick="closeCameraScan()">&times;</button>
+      <h2 class="modal-title">📷 바코드 스캔</h2>
+      <p style="color:#6B7280;font-size:0.9rem;margin-bottom:12px;">회원 바코드를 카메라에 비춰주세요</p>
+      <div id="camera-scan-frame" class="camera-scan-frame">
+        <video id="camera-scan-video" playsinline></video>
+        <div class="camera-scan-corners">
+          <span class="cs-corner cs-tl"></span><span class="cs-corner cs-tr"></span>
+          <span class="cs-corner cs-bl"></span><span class="cs-corner cs-br"></span>
+        </div>
+        <div id="camera-scan-line" class="camera-scan-line"></div>
+      </div>
+      <p id="camera-scan-status" class="camera-scan-status-text"></p>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="closeCameraScan()">취소</button>
+    </div>
+  </div>
 
   <!-- 회원가입 모달 -->
   <div id="reg-modal" class="modal-overlay">
@@ -230,7 +262,7 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=20260910d"></script>
-  <script src="js/kiosk.js?v=20260910d"></script>
+  <script src="js/api.js?v=20260910e"></script>
+  <script src="js/kiosk.js?v=20260910e"></script>
 </body>
 </html>

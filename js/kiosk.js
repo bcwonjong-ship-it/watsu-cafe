@@ -56,6 +56,7 @@ function goHome() {
   document.getElementById('user-welcome').textContent = '고객';
   const wcEl = document.getElementById('user-welcome-choice');
   if (wcEl) wcEl.textContent = '고객';
+  if (typeof closeCameraScan === 'function') closeCameraScan(); // ★ 카메라 켜진 채로 남지 않도록 정리
   showView('view-entry');
 }
 
@@ -691,6 +692,27 @@ async function showTimeMenu(facility) {
 }
 
 // ===== 7. 내 정보 =====
+// ===== ★ 내 바코드 보기 (키오스크 메인 메뉴) =====
+function showMyBarcodeKiosk() {
+  if (!userData.phone) return;
+  const cleanP = Util.cleanPhone(userData.phone);
+  Swal.fire({
+    title: `🏷️ ${userData.name}님 회원 바코드`,
+    html: `
+      <p style="color:#6B7280;font-size:0.9rem;margin-bottom:12px;">다음 방문 시 이 바코드를 키오스크 스캐너/카메라에 비추면 바로 입장됩니다</p>
+      <div style="background:#fff;padding:16px;border-radius:8px;display:inline-block;">
+        <svg id="kiosk-my-barcode-svg"></svg>
+      </div>
+      <p style="margin-top:8px;font-weight:700;letter-spacing:1px;">${Util.formatPhone(cleanP)}</p>
+    `,
+    confirmButtonText: '닫기',
+    confirmButtonColor: '#4F7BF7',
+    didOpen: () => {
+      JsBarcode('#kiosk-my-barcode-svg', cleanP, { format: 'CODE128', width: 2, height: 70, displayValue: false });
+    }
+  });
+}
+
 async function checkMyUsage() {
   if (!userData.phone) return;
   Util.showLoading(true);
@@ -865,6 +887,114 @@ async function authAndGo(url) {
   }
   window.location.href = url;
 }
+
+// ===== ★ 카메라로 바코드 스캔 (ZXing) =====
+let zxingReader = null;
+
+async function openCameraScan() {
+  const modal = document.getElementById('camera-scan-modal');
+  const statusEl = document.getElementById('camera-scan-status');
+  const videoEl = document.getElementById('camera-scan-video');
+  const frameEl = document.getElementById('camera-scan-frame');
+  if (!modal || !videoEl) return;
+
+  modal.classList.add('active');
+  statusEl.textContent = '카메라 연결 중...';
+  statusEl.classList.remove('scanning');
+  if (frameEl) frameEl.classList.remove('scanning');
+
+  if (typeof ZXing === 'undefined') {
+    statusEl.textContent = '바코드 스캔 라이브러리를 불러오지 못했습니다.';
+    return;
+  }
+
+  try {
+    zxingReader = new ZXing.BrowserMultiFormatReader();
+    const devices = await zxingReader.listVideoInputDevices();
+    if (!devices || devices.length === 0) {
+      statusEl.textContent = '카메라를 찾을 수 없습니다. 기기에 카메라가 연결되어 있는지 확인해주세요.';
+      return;
+    }
+    // 후면 카메라 우선 선택 (태블릿 뒷카메라로 바코드 스캔)
+    const backCam = devices.find(d => /back|rear|environment/i.test(d.label));
+    const deviceId = backCam ? backCam.deviceId : devices[devices.length - 1].deviceId;
+
+    await zxingReader.decodeFromVideoDevice(deviceId, videoEl, (result, err) => {
+      if (result) {
+        const scanned = Util.cleanPhone(result.getText());
+        if (scanned.length >= 10 && scanned.length <= 11) {
+          statusEl.textContent = '✅ 인식 완료!';
+          statusEl.classList.remove('scanning');
+          if (frameEl) frameEl.classList.remove('scanning');
+          closeCameraScan();
+          const display = document.getElementById('display');
+          if (display) display.value = scanned;
+          submitSearch();
+        }
+      }
+    });
+    // ★ 카메라가 켜지고 실제로 인식을 시도하는 동안 "인식 중" 표시 (스캔 라인 애니메이션 + 점 깜빡임)
+    statusEl.textContent = '인식 중...';
+    statusEl.classList.add('scanning');
+    if (frameEl) frameEl.classList.add('scanning');
+  } catch (e) {
+    console.error('[카메라 스캔] 오류:', e);
+    statusEl.textContent = '카메라를 사용할 수 없습니다: ' + (e.message || '권한을 확인해주세요.');
+    statusEl.classList.remove('scanning');
+    if (frameEl) frameEl.classList.remove('scanning');
+  }
+}
+
+function closeCameraScan() {
+  const modal = document.getElementById('camera-scan-modal');
+  const statusEl = document.getElementById('camera-scan-status');
+  const frameEl = document.getElementById('camera-scan-frame');
+  if (modal) modal.classList.remove('active');
+  if (statusEl) statusEl.classList.remove('scanning');
+  if (frameEl) frameEl.classList.remove('scanning');
+  if (zxingReader) {
+    try { zxingReader.reset(); } catch (e) { /* 무시 */ }
+    zxingReader = null;
+  }
+}
+
+// ===== ★ 바코드 스캐너 입력 감지 =====
+// 대부분의 바코드 스캐너는 "키보드 에뮬레이션" 방식으로 동작 — 스캔하면
+// 짧은 시간에 문자가 연속으로 입력되고 마지막에 Enter가 눌린 것처럼 신호를 보냄.
+// 사람이 직접 타이핑하는 속도보다 훨씬 빠르다는 점으로 스캐너 입력을 구분함.
+let barcodeBuffer = '';
+let barcodeLastTime = 0;
+const BARCODE_KEY_GAP_MS = 50; // 이 간격보다 빠르게 연속 입력되면 스캐너로 간주
+
+document.addEventListener('keydown', (e) => {
+  const now = Date.now();
+  if (now - barcodeLastTime > BARCODE_KEY_GAP_MS) {
+    barcodeBuffer = ''; // 간격이 크면 사람이 누른 것 — 버퍼 초기화
+  }
+  barcodeLastTime = now;
+
+  if (e.key === 'Enter') {
+    const scanned = Util.cleanPhone(barcodeBuffer);
+    const wasBarcode = barcodeBuffer.length >= 4; // 사람이 실수로 엔터 누른 경우와 구분
+    barcodeBuffer = '';
+    if (!wasBarcode) return;
+
+    const entryView = document.getElementById('view-entry');
+    const isHome = entryView && entryView.classList.contains('active');
+    if (isHome && scanned.length >= 10 && scanned.length <= 11) {
+      const display = document.getElementById('display');
+      if (display) display.value = scanned;
+      submitSearch();
+    }
+    return;
+  }
+  if (/^[0-9]$/.test(e.key)) {
+    barcodeBuffer += e.key;
+  } else if (e.key.length === 1) {
+    // 숫자가 아닌 문자가 섞이면 전화번호 바코드가 아님 — 버퍼 무효화
+    barcodeBuffer = '';
+  }
+});
 
 // 초기화
 document.addEventListener('DOMContentLoaded', () => {

@@ -11,8 +11,9 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260910d">
+  <link rel="stylesheet" href="css/style.css?v=20260910e">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 </head>
 <body class="mobile-body">
 
@@ -85,7 +86,12 @@
 
       <!-- 시설 예약 -->
       <div class="m-section">
-        <h3 class="m-section-title"><i class="fas fa-couch"></i> 공간 예약</h3>
+        <div class="m-section-title-row">
+          <h3 class="m-section-title"><i class="fas fa-couch"></i> 공간 예약</h3>
+          <button class="m-barcode-inline-btn" onclick="mShowMyBarcode()">
+            <i class="fas fa-barcode"></i> 내 바코드
+          </button>
+        </div>
         <div class="m-facility-grid" id="m-facility-grid"></div>
       </div>
 
@@ -95,6 +101,10 @@
           <button class="m-action-btn info" onclick="mCheckVisitCount()">
             <i class="fas fa-chart-line"></i>
             <span>이용 횟수</span>
+          </button>
+          <button class="m-action-btn" onclick="mShowMyBarcode()">
+            <i class="fas fa-barcode"></i>
+            <span>내 바코드</span>
           </button>
           <button class="m-action-btn danger" onclick="mHandleExit()">
             <i class="fas fa-sign-out-alt"></i>
@@ -116,7 +126,7 @@
     </section>
   </main>
 
-  <script src="js/api.js?v=20260910d"></script>
-  <script src="js/mobile.js?v=20260910d"></script>
+  <script src="js/api.js?v=20260910e"></script>
+  <script src="js/mobile.js?v=20260910e"></script>
 </body>
 </html>

@@ -300,6 +300,7 @@ body {
 .menu-item.purple .menu-icon { background: var(--accent-purple-light); color: var(--accent-purple); }
 .menu-item.mint .menu-icon { background: var(--accent-mint-light); color: var(--accent-mint); }
 .menu-item.pink .menu-icon { background: var(--accent-pink-light); color: var(--accent-pink); }
+.menu-item.amber .menu-icon { background: #FFF3D6; color: #E8A33D; }
 /* 키오스크 파스텔 오버라이드 */
 .kiosk-body .menu-item { background: rgba(255,255,255,0.7); border-color: #E8DFFF; }
 .kiosk-body .menu-item:hover { border-color: #C8B6FF; box-shadow: 0 4px 16px rgba(155, 135, 245, 0.15); }
@@ -307,6 +308,7 @@ body {
 .kiosk-body .menu-item.purple .menu-icon { background: #F3EFFF; color: #B8A5E8; }
 .kiosk-body .menu-item.mint .menu-icon { background: #E0F7F5; color: #5CC8BE; }
 .kiosk-body .menu-item.pink .menu-icon { background: #FFE8F0; color: #FF8FAB; }
+.kiosk-body .menu-item.amber .menu-icon { background: #FFF3D6; color: #E8A33D; }
 .menu-item .menu-text { flex: 1; }
 .menu-item .menu-title { font-weight: 700; font-size: 1.1rem; color: var(--text-primary); margin: 0 0 2px; }
 .menu-item .menu-desc { font-size: 0.85rem; color: var(--text-secondary); margin: 0; }
@@ -1075,6 +1077,34 @@ body {
   gap: 8px;
 }
 .m-section-title i { color: var(--primary); }
+.m-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.m-section-title-row .m-section-title { margin-bottom: 0; }
+.m-barcode-inline-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 2px solid var(--primary);
+  border-radius: 20px;
+  background: #fff;
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.2s;
+}
+.m-barcode-inline-btn:hover,
+.m-barcode-inline-btn:active {
+  background: var(--primary);
+  color: #fff;
+}
 
 /* 내 이용 현황 */
 .m-status-list {
@@ -1883,6 +1913,26 @@ body {
   background: var(--primary);
   color: #fff;
   border-color: var(--primary);
+}
+.member-barcode-btn {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: 0.2s;
+  flex-shrink: 0;
+}
+.member-barcode-btn:hover {
+  background: var(--secondary);
+  color: #fff;
+  border-color: var(--secondary);
 }
 .member-card-bottom {
   display: flex;
@@ -2776,4 +2826,75 @@ body {
   .choice-desc {
     font-size: 0.82rem;
   }
+}
+
+/* ===== ★ 카메라 바코드 스캔 — 인식 중 표시 ===== */
+.camera-scan-frame {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+}
+.camera-scan-frame video {
+  width: 100%;
+  display: block;
+  border-radius: 12px;
+}
+.camera-scan-corners {
+  position: absolute;
+  inset: 14%;
+  pointer-events: none;
+}
+.cs-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #4F7BF7;
+}
+.cs-tl { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 6px 0 0 0; }
+.cs-tr { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 6px 0 0; }
+.cs-bl { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 6px; }
+.cs-br { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 6px 0; }
+.camera-scan-line {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 14%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #4F7BF7 20%, #4F7BF7 80%, transparent);
+  box-shadow: 0 0 8px 1px rgba(79, 123, 247, 0.8);
+  animation: cs-scan-move 1.6s ease-in-out infinite;
+  display: none;
+}
+.camera-scan-frame.scanning .camera-scan-line { display: block; }
+@keyframes cs-scan-move {
+  0% { top: 14%; }
+  50% { top: 84%; }
+  100% { top: 14%; }
+}
+.camera-scan-status-text {
+  margin-top: 10px;
+  color: #6B7280;
+  font-size: 0.85rem;
+}
+.camera-scan-status-text.scanning {
+  color: #4F7BF7;
+  font-weight: 600;
+}
+.camera-scan-status-text.scanning::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4F7BF7;
+  margin-right: 6px;
+  animation: cs-dot-pulse 1s ease-in-out infinite;
+}
+@keyframes cs-dot-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.1); }
 }

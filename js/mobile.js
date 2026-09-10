@@ -493,6 +493,27 @@ async function mCheckVisitCount() {
   } catch (e) { Util.showLoading(false); }
 }
 
+// ===== ★ 내 바코드 (키오스크 스캐너/카메라로 입장용) =====
+function mShowMyBarcode() {
+  if (!mUser) return;
+  const cleanP = Util.cleanPhone(mUser.phone);
+  Swal.fire({
+    title: `🏷️ ${mUser.name}님 회원 바코드`,
+    html: `
+      <p style="color:#6B7280;font-size:0.85rem;margin-bottom:12px;">키오스크 입장 시 이 화면을 스캐너/카메라에 비춰주세요</p>
+      <div style="background:#fff;padding:16px;border-radius:8px;display:inline-block;">
+        <svg id="my-barcode-svg"></svg>
+      </div>
+      <p style="margin-top:8px;font-weight:700;letter-spacing:1px;">${Util.formatPhone(cleanP)}</p>
+    `,
+    confirmButtonText: '닫기',
+    confirmButtonColor: '#4F7BF7',
+    didOpen: () => {
+      JsBarcode('#my-barcode-svg', cleanP, { format: 'CODE128', width: 2, height: 70, displayValue: false });
+    }
+  });
+}
+
 // ===== 로그아웃 =====
 function mLogout() {
   sessionStorage.removeItem('mUser');
