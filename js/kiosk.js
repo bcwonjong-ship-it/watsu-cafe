@@ -890,18 +890,53 @@ async function authAndGo(url) {
 
 // ===== ★ 카메라로 바코드 스캔 (ZXing) =====
 let zxingReader = null;
+let cameraDevices = [];
+let currentCameraIndex = 0;
+
+// ★ 실제로 스캔을 시작하는 내부 함수 — openCameraScan()과 switchCameraScan()에서 공용
+async function startCameraDecode(deviceId) {
+  const statusEl = document.getElementById('camera-scan-status');
+  const videoEl = document.getElementById('camera-scan-video');
+  const frameEl = document.getElementById('camera-scan-frame');
+
+  if (zxingReader) {
+    try { zxingReader.reset(); } catch (e) { /* 무시 */ }
+  }
+  zxingReader = new ZXing.BrowserMultiFormatReader();
+
+  await zxingReader.decodeFromVideoDevice(deviceId, videoEl, (result, err) => {
+    if (result) {
+      const scanned = Util.cleanPhone(result.getText());
+      if (scanned.length >= 10 && scanned.length <= 11) {
+        statusEl.textContent = '✅ 인식 완료!';
+        statusEl.classList.remove('scanning');
+        if (frameEl) frameEl.classList.remove('scanning');
+        closeCameraScan();
+        const display = document.getElementById('display');
+        if (display) display.value = scanned;
+        submitSearch();
+      }
+    }
+  });
+  // ★ 카메라가 켜지고 실제로 인식을 시도하는 동안 "인식 중" 표시 (스캔 라인 애니메이션 + 점 깜빡임)
+  statusEl.textContent = '인식 중...';
+  statusEl.classList.add('scanning');
+  if (frameEl) frameEl.classList.add('scanning');
+}
 
 async function openCameraScan() {
   const modal = document.getElementById('camera-scan-modal');
   const statusEl = document.getElementById('camera-scan-status');
   const videoEl = document.getElementById('camera-scan-video');
   const frameEl = document.getElementById('camera-scan-frame');
+  const switchBtn = document.getElementById('camera-switch-btn');
   if (!modal || !videoEl) return;
 
   modal.classList.add('active');
   statusEl.textContent = '카메라 연결 중...';
   statusEl.classList.remove('scanning');
   if (frameEl) frameEl.classList.remove('scanning');
+  if (switchBtn) switchBtn.style.display = 'none';
 
   if (typeof ZXing === 'undefined') {
     statusEl.textContent = '바코드 스캔 라이브러리를 불러오지 못했습니다.';
@@ -909,34 +944,20 @@ async function openCameraScan() {
   }
 
   try {
-    zxingReader = new ZXing.BrowserMultiFormatReader();
-    const devices = await zxingReader.listVideoInputDevices();
-    if (!devices || devices.length === 0) {
+    const tempReader = new ZXing.BrowserMultiFormatReader();
+    cameraDevices = await tempReader.listVideoInputDevices();
+    if (!cameraDevices || cameraDevices.length === 0) {
       statusEl.textContent = '카메라를 찾을 수 없습니다. 기기에 카메라가 연결되어 있는지 확인해주세요.';
       return;
     }
     // 후면 카메라 우선 선택 (태블릿 뒷카메라로 바코드 스캔)
-    const backCam = devices.find(d => /back|rear|environment/i.test(d.label));
-    const deviceId = backCam ? backCam.deviceId : devices[devices.length - 1].deviceId;
+    const backIdx = cameraDevices.findIndex(d => /back|rear|environment/i.test(d.label));
+    currentCameraIndex = backIdx >= 0 ? backIdx : cameraDevices.length - 1;
 
-    await zxingReader.decodeFromVideoDevice(deviceId, videoEl, (result, err) => {
-      if (result) {
-        const scanned = Util.cleanPhone(result.getText());
-        if (scanned.length >= 10 && scanned.length <= 11) {
-          statusEl.textContent = '✅ 인식 완료!';
-          statusEl.classList.remove('scanning');
-          if (frameEl) frameEl.classList.remove('scanning');
-          closeCameraScan();
-          const display = document.getElementById('display');
-          if (display) display.value = scanned;
-          submitSearch();
-        }
-      }
-    });
-    // ★ 카메라가 켜지고 실제로 인식을 시도하는 동안 "인식 중" 표시 (스캔 라인 애니메이션 + 점 깜빡임)
-    statusEl.textContent = '인식 중...';
-    statusEl.classList.add('scanning');
-    if (frameEl) frameEl.classList.add('scanning');
+    // ★ 카메라가 2개 이상이면 "카메라 전환" 버튼 표시
+    if (switchBtn) switchBtn.style.display = cameraDevices.length > 1 ? 'flex' : 'none';
+
+    await startCameraDecode(cameraDevices[currentCameraIndex].deviceId);
   } catch (e) {
     console.error('[카메라 스캔] 오류:', e);
     statusEl.textContent = '카메라를 사용할 수 없습니다: ' + (e.message || '권한을 확인해주세요.');
@@ -945,13 +966,30 @@ async function openCameraScan() {
   }
 }
 
+// ★ 카메라 전환 (전면 ↔ 후면 등 연결된 다음 카메라로)
+async function switchCameraScan() {
+  if (!cameraDevices || cameraDevices.length < 2) return;
+  const statusEl = document.getElementById('camera-scan-status');
+  currentCameraIndex = (currentCameraIndex + 1) % cameraDevices.length;
+  statusEl.textContent = '카메라 전환 중...';
+  statusEl.classList.remove('scanning');
+  try {
+    await startCameraDecode(cameraDevices[currentCameraIndex].deviceId);
+  } catch (e) {
+    console.error('[카메라 전환] 오류:', e);
+    statusEl.textContent = '카메라 전환에 실패했습니다: ' + (e.message || '');
+  }
+}
+
 function closeCameraScan() {
   const modal = document.getElementById('camera-scan-modal');
   const statusEl = document.getElementById('camera-scan-status');
   const frameEl = document.getElementById('camera-scan-frame');
+  const switchBtn = document.getElementById('camera-switch-btn');
   if (modal) modal.classList.remove('active');
   if (statusEl) statusEl.classList.remove('scanning');
   if (frameEl) frameEl.classList.remove('scanning');
+  if (switchBtn) switchBtn.style.display = 'none';
   if (zxingReader) {
     try { zxingReader.reset(); } catch (e) { /* 무시 */ }
     zxingReader = null;

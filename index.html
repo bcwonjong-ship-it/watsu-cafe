@@ -11,7 +11,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260910e">
+  <link rel="stylesheet" href="css/style.css?v=20260910f">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
@@ -176,6 +176,9 @@
         <div id="camera-scan-line" class="camera-scan-line"></div>
       </div>
       <p id="camera-scan-status" class="camera-scan-status-text"></p>
+      <button id="camera-switch-btn" class="btn btn-secondary btn-block" style="margin-top:10px;display:none;" onclick="switchCameraScan()">
+        <i class="fas fa-sync-alt"></i> 카메라 전환
+      </button>
       <button class="btn btn-ghost btn-block" style="margin-top:10px;" onclick="closeCameraScan()">취소</button>
     </div>
   </div>
@@ -262,7 +265,7 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=20260910e"></script>
-  <script src="js/kiosk.js?v=20260910e"></script>
+  <script src="js/api.js?v=20260910f"></script>
+  <script src="js/kiosk.js?v=20260910f"></script>
 </body>
 </html>
