@@ -53,7 +53,7 @@ function showAuthPrompt() {
         Swal.showValidationMessage('비밀번호가 올바르지 않습니다');
         return false;
       }
-      return true;
+      return val; // ★ v13: 실제 비밀번호 문자열을 반환해야 서버 RPC에 전달 가능
     }
   }).then((result) => {
     if (result.isConfirmed) {
