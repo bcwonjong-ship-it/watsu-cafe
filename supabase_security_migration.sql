@@ -56,17 +56,22 @@ $$;
 GRANT EXECUTE ON FUNCTION public.register_member(text, text, date, text, text, text) TO anon;
 
 -- 6) ★ 관리자 전용 — 비밀번호 확인 후 전체 회원 목록
-CREATE OR REPLACE FUNCTION public.admin_list_members(p_password text)
+-- ★ v13.1: PostgREST는 RPC(POST) 호출에 Range 헤더 페이지네이션을 적용하지 않아
+-- 결과가 항상 최대 1000건으로 잘렸음(실제 회원 1967명인데 1000명만 조회됨).
+-- 함수 안에 직접 LIMIT/OFFSET을 받아 클라이언트가 반복 호출로 전체를 모으도록 변경.
+DROP FUNCTION IF EXISTS public.admin_list_members(text); -- 이전 버전(1개 인자) 정리
+
+CREATE OR REPLACE FUNCTION public.admin_list_members(p_password text, p_limit int DEFAULT 1000, p_offset int DEFAULT 0)
 RETURNS SETOF members
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF p_password IS DISTINCT FROM 'admin1388!' THEN
     RAISE EXCEPTION 'unauthorized' USING ERRCODE = '28000';
   END IF;
-  RETURN QUERY SELECT * FROM members ORDER BY registered_at DESC;
+  RETURN QUERY SELECT * FROM members ORDER BY registered_at DESC, id DESC LIMIT p_limit OFFSET p_offset;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.admin_list_members(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.admin_list_members(text, int, int) TO anon;
 
 -- 7) ★ 관리자 전용 — 비밀번호 확인 후 회원 정보 수정
 CREATE OR REPLACE FUNCTION public.admin_update_member(

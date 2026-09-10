@@ -338,7 +338,7 @@ const API = {
       try {
         const pCfg = DBManager._primary;
         const pUrl = `${pCfg.url}/rest/v1/${urlPath}`;
-        const pOpts = { ...options, headers: this._headers(pCfg) };
+        const pOpts = { ...options, headers: { ...this._headers(pCfg), ...(options.headers || {}) } };
         const res = await this._fetchSingleDB(pUrl, pOpts, table, method, 0); // 1회만
         DBManager.switchToPrimary();
         return res;
@@ -351,7 +351,7 @@ const API = {
     // -- (B) 현재 활성 DB로 시도 --
     const currentCfg = DBManager.getConfig();
     const currentUrl = `${currentCfg.url}/rest/v1/${urlPath}`;
-    const currentOpts = { ...options, headers: this._headers(currentCfg) };
+    const currentOpts = { ...options, headers: { ...this._headers(currentCfg), ...(options.headers || {}) } };
 
     try {
       return await this._fetchSingleDB(currentUrl, currentOpts, table, method, this._MAX_RETRIES);
@@ -360,7 +360,7 @@ const API = {
       if (this._isFailoverError(err.status)) {
         const fbCfg = DBManager.getFallbackConfig();
         const fbUrl = `${fbCfg.url}/rest/v1/${urlPath}`;
-        const fbOpts = { ...options, headers: this._headers(fbCfg) };
+        const fbOpts = { ...options, headers: { ...this._headers(fbCfg), ...(options.headers || {}) } };
 
         try {
           const res = await this._fetchSingleDB(fbUrl, fbOpts, table, method, 1); // 폴백은 1회 재시도
@@ -523,6 +523,22 @@ const API = {
     );
     const text = await res.text();
     return text ? JSON.parse(text) : null;
+  },
+
+  // ★ v13.1: 결과가 1000건(Supabase/PostgREST 기본 최대 반환 행 수)을 넘을 수 있는
+  // RPC는 함수 자체의 p_limit/p_offset 파라미터로 반복 호출해서 전체를 모아옴
+  // (PostgREST가 RPC POST 호출에는 Range 헤더 페이지네이션을 적용하지 않기 때문)
+  async rpcPaginated(fnName, params = {}) {
+    const PAGE_SIZE = 1000;
+    let all = [];
+    let offset = 0;
+    while (true) {
+      const page = await this.rpc(fnName, { ...params, p_limit: PAGE_SIZE, p_offset: offset }) || [];
+      all = all.concat(page);
+      if (page.length < PAGE_SIZE) break;
+      offset += PAGE_SIZE;
+    }
+    return all;
   }
 };
 
@@ -1160,7 +1176,7 @@ const Service = {
   // ★ v13: members 전체 조회/수정/삭제는 비밀번호를 서버(Postgres 함수)에서 검증하는
   // RPC로만 가능 — anon 키만으로는 더 이상 전체 회원목록을 가져올 수 없음
   async getAllMembers(password) {
-    return await API.rpc('admin_list_members', { p_password: password });
+    return await API.rpcPaginated('admin_list_members', { p_password: password });
   },
 
   async updateMember(memberId, data, password) {
@@ -1178,7 +1194,7 @@ const Service = {
   },
 
   async searchMembers(query, password) {
-    const members = await API.rpc('admin_list_members', { p_password: password });
+    const members = await API.rpcPaginated('admin_list_members', { p_password: password });
     const q = query.trim().toLowerCase();
     if (!q) return members;
     return members.filter(m =>

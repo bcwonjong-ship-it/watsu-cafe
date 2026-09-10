@@ -895,7 +895,7 @@ async function doExport(type) {
   try {
     if (type === 'members') {
       // ★ v13: members는 anon 직접 조회가 막혀있어 비밀번호 확인 RPC로 조회
-      const members = await API.rpc('admin_list_members', { p_password: sessionStorage.getItem('export_pw') || '' });
+      const members = await API.rpcPaginated('admin_list_members', { p_password: sessionStorage.getItem('export_pw') || '' });
       GSheets.exportToCSV(GSheets.formatMembersForSheet(members), `명단_개인_${Util.todayStr()}.csv`);
     } else if (type === 'logs') {
       const logs = await API.list('access_logs');
