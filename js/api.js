@@ -512,6 +512,17 @@ const API = {
 
     // ★ v12e 듀얼 라이트: 상대편 DB에도 동일 DELETE 적용
     this._syncToOtherDB(`${table}?id=eq.${id}`, { method: 'DELETE' }, 'DELETE');
+  },
+
+  // ★ v13: members 등 민감 테이블은 anon 직접 접근을 막고 Postgres 함수(RPC)로만 접근
+  async rpc(fnName, params = {}) {
+    const res = await this._fetchWithRetry(
+      `rpc/${fnName}`,
+      { method: 'POST', body: JSON.stringify(params) },
+      fnName, 'POST'
+    );
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
   }
 };
 
@@ -519,29 +530,30 @@ const API = {
 const Service = {
 
   // ★ v12f: phones 배열이 클 때 50개씩 배치로 members 조회 (400 에러 방지)
+  // ★ v13: members 테이블 직접 접근 대신 RPC(lookup_members_by_phones) 사용 — 전체 테이블 노출 차단
   async _batchGetMembers(phones) {
     if (!phones || phones.length === 0) return [];
     const BATCH = 50;
     let all = [];
     for (let i = 0; i < phones.length; i += BATCH) {
       const chunk = phones.slice(i, i + BATCH);
-      const rows = await API.list('members', { phone: `in.(${chunk.join(',')})` });
-      all = all.concat(rows);
+      const rows = await API.rpc('lookup_members_by_phones', { p_phones: chunk });
+      all = all.concat(rows || []);
     }
     return all;
   },
 
+  // ★ v13: RPC(lookup_member_by_phone) 사용 — anon은 전화번호 단건 조회만 가능
   async findMemberByPhone(phone) {
     const cleanP = Util.cleanPhone(phone);
-    // ★ v7: 전체 회원 목록 대신 phone 일치 건만 서버에서 필터링
-    const members = await API.list('members', { phone: `eq.${cleanP}` });
-    return members[0] || null;
+    const members = await API.rpc('lookup_member_by_phone', { p_phone: cleanP });
+    return (members && members[0]) || null;
   },
 
   async loginByNameAndPin(name, pin) {
-    // ★ v7: 이름으로 서버 필터 → PIN(전화번호 뒷4자리)은 클라이언트에서 비교
-    const members = await API.list('members', { name: `eq.${name.trim()}` });
-    const found = members.filter(m => Util.phoneLast4(m.phone) === pin);
+    // ★ v13: RPC(lookup_members_by_name) 사용 → PIN(전화번호 뒷4자리)은 클라이언트에서 비교
+    const members = await API.rpc('lookup_members_by_name', { p_name: name.trim() });
+    const found = (members || []).filter(m => Util.phoneLast4(m.phone) === pin);
     return found.length === 0 ? null : found[0];
   },
 
@@ -615,11 +627,12 @@ const Service = {
       await this.addDailyVisitor(cleanP, displayName, '단체', '단체', groupCount, groupDetail);
       return { status: 'success', name: displayName, phone: cleanP, message: '단체 입장 기록 완료!' };
     } else {
-      const newMember = await API.create('members', {
-        phone: cleanP, name, birthdate, gender,
-        reg_type: '개인', member_code: '',
-        registered_at: Date.now()
+      // ★ v13: members INSERT도 RPC(register_member) 경유 (anon 직접 INSERT 권한 제거)
+      const registered = await API.rpc('register_member', {
+        p_phone: cleanP, p_name: name, p_birthdate: birthdate || null, p_gender: gender,
+        p_reg_type: '개인', p_member_code: ''
       });
+      const newMember = registered && registered[0];
       await API.create('access_logs', {
         date: today, entry_time: time, exit_time: '',
         phone: cleanP, name, note: '휴카페',
@@ -1021,7 +1034,7 @@ const Service = {
     // ★ v7: 회원 전체 대신, 오늘 활성 로그에 등장하는 전화번호만 phone=in.() 으로 조회
     const activePhones = [...new Set(activeLogs.map(l => Util.cleanPhone(l.phone)))];
     const members = activePhones.length > 0
-      ? await API.list('members', { phone: `in.(${activePhones.join(',')})` })
+      ? await this._batchGetMembers(activePhones)
       : [];
     const memberMap = {};
     members.forEach(m => { memberMap[Util.cleanPhone(m.phone)] = m; });
@@ -1144,22 +1157,28 @@ const Service = {
   },
 
   // ===== 회원 관리 =====
-  async getAllMembers() {
-    return await API.list('members');
+  // ★ v13: members 전체 조회/수정/삭제는 비밀번호를 서버(Postgres 함수)에서 검증하는
+  // RPC로만 가능 — anon 키만으로는 더 이상 전체 회원목록을 가져올 수 없음
+  async getAllMembers(password) {
+    return await API.rpc('admin_list_members', { p_password: password });
   },
 
-  async updateMember(memberId, data) {
-    await API.update('members', memberId, data);
+  async updateMember(memberId, data, password) {
+    await API.rpc('admin_update_member', {
+      p_password: password, p_id: Number(memberId),
+      p_name: data.name, p_phone: data.phone,
+      p_birthdate: data.birthdate || null, p_gender: data.gender || null
+    });
     return { status: 'success', message: '회원 정보가 수정되었습니다.' };
   },
 
-  async deleteMember(memberId) {
-    await API.remove('members', memberId);
+  async deleteMember(memberId, password) {
+    await API.rpc('admin_delete_member', { p_password: password, p_id: Number(memberId) });
     return { status: 'success', message: '회원이 삭제되었습니다.' };
   },
 
-  async searchMembers(query) {
-    const members = await API.list('members');
+  async searchMembers(query, password) {
+    const members = await API.rpc('admin_list_members', { p_password: password });
     const q = query.trim().toLowerCase();
     if (!q) return members;
     return members.filter(m =>

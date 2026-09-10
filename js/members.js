@@ -18,14 +18,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ===== 비밀번호 인증 =====
+// ★ v13: 비밀번호는 이제 서버(Postgres 함수)에서도 다시 검증됨.
+// 여기서의 확인은 빠른 UX 피드백용이고, 실제 데이터 접근 차단은 서버 쪽에서 이루어짐.
 function checkAuth() {
-  // 세션 중 인증 유지 (sessionStorage)
-  if (sessionStorage.getItem('members_auth') === 'ok') {
+  // 세션 중 인증 유지 (sessionStorage) — 비밀번호 자체를 저장해 매 요청마다 서버에 함께 전달
+  const savedPw = sessionStorage.getItem('members_pw');
+  if (savedPw) {
     isAuthenticated = true;
     loadMembers();
     return;
   }
   showAuthPrompt();
+}
+
+function getAdminPw() {
+  return sessionStorage.getItem('members_pw') || '';
 }
 
 function showAuthPrompt() {
@@ -51,7 +58,7 @@ function showAuthPrompt() {
   }).then((result) => {
     if (result.isConfirmed) {
       isAuthenticated = true;
-      sessionStorage.setItem('members_auth', 'ok');
+      sessionStorage.setItem('members_pw', result.value);
       loadMembers();
     } else {
       // 돌아가기: 이전 페이지 또는 키오스크로
@@ -65,7 +72,7 @@ async function loadMembers() {
   if (!isAuthenticated) return;
   Util.showLoading(true);
   try {
-    allMembers = await Service.getAllMembers();
+    allMembers = await Service.getAllMembers(getAdminPw());
     // 최근 가입순 정렬
     allMembers.sort((a, b) => (b.registered_at || 0) - (a.registered_at || 0));
     applyFilter();
@@ -73,6 +80,14 @@ async function loadMembers() {
   } catch (e) {
     Util.showLoading(false);
     console.error('회원 로딩 실패:', e);
+    // ★ v13: 서버가 비밀번호를 거부(403)하면 세션을 지우고 다시 인증받기
+    if (e.status === 403 || e.status === 401) {
+      sessionStorage.removeItem('members_pw');
+      isAuthenticated = false;
+      Swal.fire({ title: '인증 만료', text: '비밀번호를 다시 입력해주세요.', icon: 'warning', confirmButtonColor: '#4F7BF7' })
+        .then(() => showAuthPrompt());
+      return;
+    }
     document.getElementById('member-list').innerHTML =
       `<div class="empty-state"><i class="fas fa-exclamation-circle"></i><p>데이터 로딩 실패</p><p style="font-size:0.85rem;color:#9CA3AF;margin-top:8px;">${e.message || '서버 연결을 확인해주세요'}</p></div>`;
   }
@@ -239,7 +254,7 @@ async function saveEdit() {
 
   Util.showLoading(true);
   try {
-    const result = await Service.updateMember(id, updateData);
+    const result = await Service.updateMember(id, updateData, getAdminPw());
     console.log('saveEdit 응답:', result);
     Util.showLoading(false);
     closeEditModal();
@@ -283,7 +298,7 @@ async function deleteMember() {
 
   Util.showLoading(true);
   try {
-    await Service.deleteMember(id);
+    await Service.deleteMember(id, getAdminPw());
     Util.showLoading(false);
     closeEditModal();
     await Swal.fire({
