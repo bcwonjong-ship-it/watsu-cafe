@@ -151,8 +151,10 @@ function renderMembers() {
   list.innerHTML = filteredMembers.map(m => {
     const ageGroup = Util.getAgeGroup(m.birthdate);
     const genderIcon = m.gender === '남' ? '👦' : (m.gender === '여' ? '👧' : '👤');
+    // ★ registered_at은 Supabase에서 bigint(epoch ms)가 문자열로 내려오므로 Number 변환 필요
+    // (new Date('1788939808702')는 날짜 텍스트로 오인되어 Invalid Date가 됨)
     const regDate = m.registered_at
-      ? new Date(m.registered_at).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
+      ? new Date(Number(m.registered_at)).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
       : '-';
     const birthDisplay = m.birthdate || '-';
 

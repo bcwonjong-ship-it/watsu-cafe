@@ -73,7 +73,7 @@ const GSheets = {
       '연락처': Util.formatPhone(m.phone) || '',
       '생년월일': m.birthdate || '',
       '성별': m.gender || '',
-      '가입일': m.registered_at ? new Date(m.registered_at).toLocaleDateString('ko-KR') : '',
+      '가입일': m.registered_at ? new Date(Number(m.registered_at)).toLocaleDateString('ko-KR') : '',
       '입장여부(T/F)': ''
     }));
   },
@@ -86,7 +86,7 @@ const GSheets = {
       '단체명': g.group_name || '',
       '연령대별인원': g.group_detail || '',
       '개인정보동의(T/F)': 'T',
-      '가입일': g.registered_at ? new Date(g.registered_at).toLocaleDateString('ko-KR') : '',
+      '가입일': g.registered_at ? new Date(Number(g.registered_at)).toLocaleDateString('ko-KR') : '',
       '현재상태': ''
     }));
   },
