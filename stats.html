@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260910f">
+  <link rel="stylesheet" href="css/style.css?v=20260910g">
   <style>
     body {
       background: linear-gradient(135deg, #F5F7FC 0%, #EEF2FB 100%);
@@ -330,11 +330,11 @@
               <th>남초</th><th>여초</th><th>남중</th><th>여중</th>
               <th>남고</th><th>여고</th><th>남후청</th><th>여후청</th>
               <th>남성인</th><th>여성인</th>
-              <th>단체</th><th>작년</th>
+              <th>단체</th>
             </tr>
           </thead>
           <tbody id="daily-table-body">
-            <tr><td colspan="12" style="text-align:center;color:var(--text-muted);padding:30px;">데이터를 불러오는 중...</td></tr>
+            <tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:30px;">데이터를 불러오는 중...</td></tr>
           </tbody>
           <tfoot id="daily-table-foot"></tfoot>
         </table>
@@ -347,7 +347,7 @@
 
   </main>
 
-  <script src="js/api.js?v=20260910f"></script>
+  <script src="js/api.js?v=20260910g"></script>
   <script>
     // ===== 독립 통계 페이지 로직 (★ v9.3: 수동 조회 모드 — egress 절감) =====
 
@@ -433,14 +433,8 @@
       const tbody = document.getElementById('daily-table-body');
       const tfoot = document.getElementById('daily-table-foot');
 
-      const prevYear = String(parseInt(m.slice(0,4)) - 1);
-      const prevMonth = m.slice(5, 7);
-      const prevData = await Service.getPrevYearMonthly(prevYear);
-      const prevMonthData = prevData[prevMonth];
-      const prevTotal = prevMonthData ? (parseInt(prevMonthData.total) || 0) : 0;
-
       if (!rows || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:30px;">해당 월 데이터가 없습니다</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:30px;">해당 월 데이터가 없습니다</td></tr>';
         tfoot.innerHTML = '';
         return;
       }
@@ -464,7 +458,6 @@
           <td>${v(r.m_youth)}</td><td>${v(r.f_youth)}</td>
           <td>${v(r.m_adult)}</td><td>${v(r.f_adult)}</td>
           <td>${v(r.group_total)}</td>
-          <td class="prev-col">${prevTotal > 0 ? Math.round(prevTotal / rows.length) : '-'}</td>
         </tr>`;
       }).join('');
 
@@ -477,7 +470,6 @@
         <td><strong>${totals.m_youth || '-'}</strong></td><td><strong>${totals.f_youth || '-'}</strong></td>
         <td><strong>${totals.m_adult || '-'}</strong></td><td><strong>${totals.f_adult || '-'}</strong></td>
         <td><strong>${totals.group_total || '-'}</strong></td>
-        <td class="prev-col"><strong>${prevTotal || '-'}</strong></td>
       </tr>`;
     }
 

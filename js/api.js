@@ -11,12 +11,15 @@
  */
 
 // ===== ★ Supabase Primary DB 설정 =====
-const SUPABASE_URL = 'https://ymzcrjdzjolbebdjdilr.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_kmYOmZkiGKpFsHbgm7J95g_vHDGMGVf';
+// ★ 2026-09-23: 기존 Primary/Secondary 프로젝트 둘 다 삭제되어(장기 미사용) 새 프로젝트로 복구
+const SUPABASE_URL = 'https://izpchwapocujcxpeqdot.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_f-9Vx_Vdf7bmeF2LI5HsdA_caczwvz3';
 
 // ===== ★ Supabase Secondary DB 설정 (페일오버용) =====
-const SUPABASE_URL_2 = 'https://fqgsieulcxekejtfofiq.supabase.co';
-const SUPABASE_KEY_2 = 'sb_publishable_qoWk8V1u5PYcaIFRlSUmFw_yRl5tVEd';
+// TODO: 별도의 보조 프로젝트를 새로 만들면 여기를 그 주소로 교체할 것.
+// 지금은 보조 프로젝트가 없어서 임시로 Primary와 동일하게 지정(페일오버 무의미하지만 에러는 안 남).
+const SUPABASE_URL_2 = 'https://izpchwapocujcxpeqdot.supabase.co';
+const SUPABASE_KEY_2 = 'sb_publishable_f-9Vx_Vdf7bmeF2LI5HsdA_caczwvz3';
 
 // ===== ★ v12d: DB 매니저 — Primary/Secondary 자동 전환 =====
 const DBManager = {
