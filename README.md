@@ -152,8 +152,8 @@
 
 ### 2. DBManager — Primary/Secondary DB 자동 전환
 - **`DBManager` 객체** 추가 (api.js) — Primary/Secondary Supabase 프로젝트 설정 관리
-- **Primary DB**: `ymzcrjdzjolbebdjdilr.supabase.co`
-- **Secondary DB**: `fqgsieulcxekejtfofiq.supabase.co` (페일오버용)
+- **Primary DB**: `ymzcrjdzjolbebdjdilr.supabase.co` (※ 2026-09-23 삭제 확인 → 현재는 `izpchwapocujcxpeqdot.supabase.co`)
+- **Secondary DB**: `fqgsieulcxekejtfofiq.supabase.co` (페일오버용, ※ 삭제됨 — 현재는 임시로 Primary와 같은 주소를 지정, 별도 보조 프로젝트 없음)
 - 상태 추적: `_current` (primary/secondary), `_failedAt` (실패 시각)
 - **5분 복구 탐색**: Secondary 사용 중 5분 경과 시 Primary로 1회 테스트 → 성공 시 자동 복귀
 
