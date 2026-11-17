@@ -155,15 +155,18 @@ function isExitEmpty(val) {
 // ===== 시설 설정 =====
 const FacilityConfig = {
   facilities: {
-    '모임방': { icon: '🏠', subs: ['노랑방','파랑방','핑크방','초록방'], timeLimit: 60, type: 'room', hasWaitlist: true },
+    // ★ v14: 키오스크 2열 배치 — 윗칸 노랑·초록 / 아랫칸 핑크·파랑
+    '모임방': { icon: '🏠', subs: ['노랑방','초록방','핑크방','파랑방'], timeLimit: 60, type: 'room', hasWaitlist: true },
     '노래방': { icon: '🎤', subs: ['1번방','2번방','3번방'], timeLimit: 30, type: 'room', hasWaitlist: true },
     '탁구장': { icon: '🏓', subs: ['탁구대'], timeLimit: 30, type: 'sport', hasWaitlist: true },
     '닌텐도': { icon: '🎮', subs: ['닌텐도1','닌텐도2','닌텐도3','닌텐도4'], timeLimit: 60, type: 'game', hasWaitlist: true },
+    // ★ v14: 철권게임 추가
+    '철권게임': { icon: '🕹️', subs: ['철권게임기'], timeLimit: 30, type: 'game', hasWaitlist: true },
     '보드게임': { icon: '🎲', subs: [], timeLimit: 0, type: 'game', hasWaitlist: false },
     '댄스연습실': { icon: '💃', subs: 'timeslot', timeLimit: 0, type: 'timeslot', hasWaitlist: false, adminOnly: true },
     '멀티룸': { icon: '🖥️', subs: 'timeslot', timeLimit: 0, type: 'timeslot', hasWaitlist: false, adminOnly: true }
   },
-  waitlistFacilities: ['모임방', '노래방', '탁구장', '닌텐도'],
+  waitlistFacilities: ['모임방', '노래방', '탁구장', '닌텐도', '철권게임'],
 
   // ★ v12e: 요일별 동적 시간제한 반환 (토요일 노래방 20분)
   getTimeLimit(facility) {
@@ -202,8 +205,11 @@ const FacilityConfig = {
     }
 
     // 일/월(관리자 강제 오픈) → 10-20시, 토 → 10-18시, 화~금 → 10-20시
+    // ★ v14: 관리자(forceOpen)는 휴관일·운영시간 무관 → 모든 요일 10-20시
     let endHour;
-    if (dayOfWeek === 0 || dayOfWeek === 1) {
+    if (forceOpen) {
+      endHour = 20;
+    } else if (dayOfWeek === 0 || dayOfWeek === 1) {
       endHour = 20; // 관리자 전용 — 일/월도 10-20시
     } else if (dayOfWeek === 6) {
       endHour = 18; // 토요일
@@ -255,6 +261,18 @@ const AdminAuth = {
 
   isAdminPhone(phone) {
     return Util.cleanPhone(phone) === this.ADMIN_PHONE;
+  },
+
+  // ★ v14: 키오스크에서 관리자 인증 1회 → 이용자관리/현황판/내보내기 재인증 생략 (같은 탭 세션 동안)
+  markVerified(pw) {
+    sessionStorage.setItem('admin_verified', 'ok');
+    sessionStorage.setItem('members_pw', pw);   // members.js 인증 + 서버 RPC 비밀번호
+    sessionStorage.setItem('export_auth', 'ok'); // admin.js 내보내기 인증
+    sessionStorage.setItem('export_pw', pw);
+  },
+
+  isVerified() {
+    return sessionStorage.getItem('admin_verified') === 'ok';
   }
 };
 
@@ -702,6 +720,11 @@ const Service = {
     for (const w of waits) {
       await API.update('waitlist', w.id, { status: 'cancelled' });
     }
+    // ★ v14: 퇴장으로 비게 된 방/기기는 대기 1순위 자동 이용시작
+    for (const r of reserves) {
+      try { await this._promoteNextWaiter(r.facility, r.detail); }
+      catch (e) { console.warn('대기자 자동 이용시작 실패:', e.message); }
+    }
     return { status: 'success' };
   },
 
@@ -714,12 +737,44 @@ const Service = {
     return count;
   },
 
+  // ★ v14: 이용중지 → 해당 방/기기의 대기 1순위를 자동으로 이용시작 처리
   async exitFacility(reservationId) {
+    const r = await API.get('facility_reservations', reservationId);
     await API.update('facility_reservations', reservationId, { exit_time: Util.timeStr() });
-    return { status: 'success' };
+    let promoted = null;
+    if (r) {
+      try { promoted = await this._promoteNextWaiter(r.facility, r.detail); }
+      catch (e) { console.warn('대기자 자동 이용시작 실패:', e.message); }
+    }
+    return { status: 'success', promoted };
+  },
+
+  // ★ v14: 대기 1순위 자동 이용시작 — 빈 방이 되었을 때만 실행
+  async _promoteNextWaiter(facility, detail) {
+    const config = FacilityConfig.facilities[facility];
+    if (!config || !config.hasWaitlist) return null;
+    const today = Util.todayStr();
+    const det = detail || '-';
+    API.clearCache();
+    // 아직 같은 방을 다른 사람이 이용 중이면 승격하지 않음
+    const stillUsed = await API.list('facility_reservations', { date: `eq.${today}`, facility: `eq.${facility}`, detail: `eq.${det}`, exit_time: 'eq.' });
+    if (stillUsed.length > 0) return null;
+    const waits = (await API.list('waitlist', { date: `eq.${today}`, facility: `eq.${facility}`, detail: `eq.${det}`, status: 'in.(waiting,called)' }))
+      .sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+    for (const w of waits) {
+      const res = await this.reserveFacility(w.phone, w.name, facility, det === '-' ? '' : det, '', { fromWaitlist: true });
+      if (res.status === 'success') {
+        await API.update('waitlist', w.id, { status: 'completed' });
+        return { name: w.name, facility, detail: det };
+      }
+      // 이용시작 불가(예: 이미 다른 모임방 이용 중) → 다음 대기자로
+    }
+    return null;
   },
 
   async _autoCloseExpiredTimeslot(r) {
+    // ★ v14: 관리자 예약은 운영시간·시간대가 지나도 자동 해제하지 않음
+    if (AdminAuth.isAdminPhone(r.phone)) return false;
     const config = FacilityConfig.facilities[r.facility];
     if (config && config.type === 'timeslot' && r.detail && r.detail !== '-') {
       const endHourMatch = r.detail.match(/~\s*(\d+):00/);
@@ -734,15 +789,15 @@ const Service = {
     return false;
   },
 
-  async reserveFacility(phone, name, facility, detail, note) {
+  async reserveFacility(phone, name, facility, detail, note, opts = {}) {
     const cleanP = Util.cleanPhone(phone);
     const today = Util.todayStr();
     const time = Util.timeStr();
     const config = FacilityConfig.facilities[facility];
     const isAdmin = AdminAuth.isAdminPhone(cleanP);
 
-    // ★ 관리자는 운영시간 제한 없음
-    if (!Util.isOperatingHours() && !isAdmin) {
+    // ★ 관리자는 운영시간 제한 없음 / ★ v14: 대기자 자동·수동 이용시작도 운영시간 체크 생략
+    if (!Util.isOperatingHours() && !isAdmin && !opts.fromWaitlist) {
       return { status: 'error', message: '운영시간(10:00~20:00)이 아닙니다.\n운영시간 내에 예약해주세요.' };
     }
 
@@ -776,17 +831,13 @@ const Service = {
     }
 
     // ★ 중복 예약 체크 — 모임방은 1개만, 나머지는 동일 세부(방/기기)만 차단
-    // ★ 관리자의 timeslot 시설(댄스연습실/멀티룸)은 여러 시간대 예약 가능 → 동일 시간대만 차단
-    if (facility === '모임방') {
+    // ★ v14: 관리자는 모든 시설 중복 예약 가능 (체크 생략)
+    if (isAdmin) {
+      // no-op
+    } else if (facility === '모임방') {
       const dupRoom = myActive.find(r => r.facility === '모임방');
       if (dupRoom) {
         return { status: 'error', message: `이미 모임방(${dupRoom.detail})을 이용 중입니다. 모임방은 1개만 예약 가능합니다.` };
-      }
-    } else if (isAdmin && config && config.type === 'timeslot') {
-      // 관리자 timeslot: 동일 시설+동일 시간대만 중복 차단
-      const dup = myActive.find(r => r.facility === facility && r.detail === (detail || '-'));
-      if (dup) {
-        return { status: 'error', message: `이미 ${facility} ${detail || ''}이(가) 예약되어 있습니다.` };
       }
     } else {
       const dup = myActive.find(r => r.facility === facility && r.detail === (detail || '-'));
@@ -832,17 +883,20 @@ const Service = {
     return { status: 'success', message: `${facility} ${detail || ''} 예약 완료!` };
   },
 
+  // ★ v14: 양수 = 연장, 음수 = 단축 (최소 1분 유지 — 0은 '무제한' 의미라 사용 불가)
   async extendTime(reservationId, addMinutes = 30) {
     const r = await API.get('facility_reservations', reservationId);
     if (!r) return { status: 'error', message: '예약을 찾을 수 없습니다.' };
     const currentLimit = parseInt(r.time_limit, 10) || 30;
-    const mins = parseInt(addMinutes, 10) || 10;
-    const newLimit = currentLimit + mins;
-    const extCount = (parseInt(r.extended_count, 10) || 0) + 1;
+    const mins = parseInt(addMinutes, 10);
+    if (!mins) return { status: 'error', message: '변경할 시간을 입력해주세요.' };
+    const newLimit = Math.max(currentLimit + mins, 1);
+    const extCount = (parseInt(r.extended_count, 10) || 0) + (mins > 0 ? 1 : 0);
     await API.update('facility_reservations', reservationId, {
       time_limit: newLimit, extended_count: extCount
     });
-    return { status: 'success', message: `${mins}분 연장 완료! (총 ${newLimit}분)` };
+    const label = mins > 0 ? `${mins}분 연장` : `${Math.abs(mins)}분 단축`;
+    return { status: 'success', message: `${label} 완료! (총 ${newLimit}분)` };
   },
 
   async getOccupiedFacilities() {
@@ -910,6 +964,13 @@ const Service = {
     const facilityWaits = facilityWaitsAll.filter(w => (detail ? w.detail === detail : true));
     const queueNumber = facilityWaits.length + 1;
 
+    // ★ v14: 등록 시점의 예상 대기시간 계산 (현재 이용자 남은시간 + 앞 대기자 × 기본시간)
+    let estimateMin = 0;
+    try {
+      const est = await this.getWaitEstimate(facility, detail);
+      estimateMin = est.estimateMin;
+    } catch (e) { /* 예상시간 실패해도 등록은 진행 */ }
+
     await API.create('waitlist', {
       date: today, facility, detail: detail || '-',
       phone: cleanP, name,
@@ -922,8 +983,68 @@ const Service = {
     return {
       status: 'success',
       queueNumber,
-      message: `${facility} ${detail || ''} 대기 ${queueNumber}번째 등록!`
+      estimateMin,
+      message: `${facility} ${detail || ''} 대기 ${queueNumber}번째 등록!` + (estimateMin > 0 ? ` (예상 대기 약 ${estimateMin}분)` : '')
     };
+  },
+
+  // ★ v14: 시설·방(기기)별 현황판 데이터 — 키오스크/모바일/관리자 공통
+  // 반환: { [시설명]: { config, baseTime, subs:[{ name, reserve, remain, waits:[{...w, position, estMin, waitedMin}], nextQueue, nextEstimate }], extraWaits:[] } }
+  async getFacilityBoard() {
+    const today = Util.todayStr();
+    const [reserves, waits] = await Promise.all([
+      API.list('facility_reservations', { date: `eq.${today}`, exit_time: 'eq.' }, true),
+      API.list('waitlist', { date: `eq.${today}`, status: 'in.(waiting,called)' }, true)
+    ]);
+    const sortedWaits = waits.slice().sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+    const nowMs = Date.now();
+    const remainOf = (r) => {
+      const tLimit = parseInt(r.time_limit, 10) || 0;
+      if (tLimit <= 0 || !r.entry_time) return 0;
+      return Math.max(tLimit - Util.getElapsedMinutes(r.entry_time), 0);
+    };
+
+    const board = {};
+    for (const [facName, config] of Object.entries(FacilityConfig.facilities)) {
+      if (!Array.isArray(config.subs)) continue; // timeslot 시설 제외
+      const baseTime = FacilityConfig.getTimeLimit(facName);
+      const facReserves = reserves.filter(r => r.facility === facName);
+      const facWaits = sortedWaits.filter(w => w.facility === facName);
+      const used = new Set();
+
+      const subs = config.subs.map(sub => {
+        const subReserves = facReserves.filter(r => r.detail === sub);
+        const reserve = subReserves[0] || null;
+        // 여러 명이 같은 방을 쓰는 경우(관리자 중복) 가장 늦게 끝나는 사람 기준
+        const remain = subReserves.length ? Math.max(...subReserves.map(remainOf)) : 0;
+        const subWaits = facWaits.filter(w => w.detail === sub).map((w, i) => {
+          used.add(w.id);
+          return {
+            ...w,
+            position: i + 1,
+            estMin: (reserve ? remain : 0) + i * baseTime,
+            waitedMin: w.created_at ? Math.max(0, Math.floor((nowMs - w.created_at) / 60000)) : 0
+          };
+        });
+        return {
+          name: sub,
+          reserve,
+          reserves: subReserves,
+          remain,
+          waits: subWaits,
+          nextQueue: subWaits.length + 1,
+          nextEstimate: (reserve ? remain : 0) + subWaits.length * baseTime
+        };
+      });
+
+      const extraWaits = facWaits.filter(w => !used.has(w.id)).map((w, i) => ({
+        ...w, position: i + 1, estMin: 0,
+        waitedMin: w.created_at ? Math.max(0, Math.floor((nowMs - w.created_at) / 60000)) : 0
+      }));
+      const extraReserves = facReserves.filter(r => !config.subs.includes(r.detail));
+      board[facName] = { config, baseTime, subs, extraWaits, extraReserves };
+    }
+    return board;
   },
 
   // ★ v12f: 대기 예상 시간 계산
@@ -1013,13 +1134,15 @@ const Service = {
     return { status: 'success' };
   },
 
+  // ★ v14: 호출 단계 없이 바로 이용시작 (waiting/called 모두 허용)
   async confirmWaitlistEntry(waitId) {
     const w = await API.get('waitlist', waitId);
-    if (!w || w.status !== 'called') {
-      return { status: 'error', message: '호출된 대기가 아닙니다.' };
+    if (!w || (w.status !== 'called' && w.status !== 'waiting')) {
+      return { status: 'error', message: '유효한 대기가 아닙니다.' };
     }
-    const result = await this.reserveFacility(w.phone, w.name, w.facility, w.detail === '-' ? '' : w.detail);
+    const result = await this.reserveFacility(w.phone, w.name, w.facility, w.detail === '-' ? '' : w.detail, '', { fromWaitlist: true });
     if (result.status === 'success') {
+      await API.update('waitlist', w.id, { status: 'completed' });
       return { status: 'success', message: `${w.facility} ${w.detail !== '-' ? w.detail : ''} 이용이 시작되었습니다!` };
     }
     return result;
@@ -1034,7 +1157,20 @@ const Service = {
     const cleanP = Util.cleanPhone(phone);
     const today = Util.todayStr();
     // ★ v7: 오늘 + 해당 전화번호 + 활성 대기열만 조회
-    return await API.list('waitlist', { date: `eq.${today}`, phone: `eq.${cleanP}`, status: 'in.(waiting,called)' });
+    const mine = await API.list('waitlist', { date: `eq.${today}`, phone: `eq.${cleanP}`, status: 'in.(waiting,called)' });
+    // ★ v14: 앞사람이 이용시작하면 순번이 당겨지도록 실시간 순번/예상시간 계산
+    if (mine.length > 0) {
+      try {
+        const board = await this.getFacilityBoard();
+        mine.forEach(w => {
+          const fac = board[w.facility];
+          const sub = fac && fac.subs.find(s => s.name === w.detail);
+          const me = sub && sub.waits.find(x => x.id === w.id);
+          if (me) { w.live_position = me.position; w.est_min = me.estMin; }
+        });
+      } catch (e) { /* 실시간 순번 실패 시 queue_number 사용 */ }
+    }
+    return mine;
   },
 
   async getActiveUsers() {

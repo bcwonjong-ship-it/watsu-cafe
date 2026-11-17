@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20261117a">
+  <link rel="stylesheet" href="css/style.css?v=20261117b">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="admin-body">
@@ -78,22 +78,22 @@
     </div>
   </section>
 
+  <!-- ★ v14: 관리자 예약 현황을 대기열·이용현황보다 앞에 배치 -->
+  <section id="admin-reserve-panel" class="admin-reserve-panel">
+    <h3 class="admin-reserve-title"><i class="fas fa-user-shield"></i> 관리자 예약 현황</h3>
+    <div id="admin-reserve-list" class="admin-reserve-list"></div>
+  </section>
+
   <!-- 대기열 패널 -->
   <section id="waitlist-panel" class="waitlist-panel" style="display:none;">
     <h3 class="waitlist-panel-title"><i class="fas fa-list-ol"></i> 시설별 대기열 현황</h3>
     <div id="waitlist-content" class="waitlist-content"></div>
   </section>
 
-  <!-- ★ 시설별 이용현황 패널 -->
+  <!-- ★ 시설별 이용현황 패널 (v14: 방/기기별 현황판) -->
   <section id="facility-status-panel" class="facility-status-panel">
-    <h3 class="fac-status-title"><i class="fas fa-th-large"></i> 시설별 이용현황</h3>
+    <h3 class="fac-status-title"><i class="fas fa-th-large"></i> 시설별 이용현황 <span class="fac-status-hint">방·기기별 이용자 / 대기 순서 / 예상 대기시간</span></h3>
     <div id="facility-status-grid" class="facility-status-grid"></div>
-  </section>
-
-  <!-- ★ 관리자 예약 현황 패널 -->
-  <section id="admin-reserve-panel" class="admin-reserve-panel">
-    <h3 class="admin-reserve-title"><i class="fas fa-user-shield"></i> 관리자 예약 현황</h3>
-    <div id="admin-reserve-list" class="admin-reserve-list"></div>
   </section>
 
   <!-- User Grid -->
@@ -278,8 +278,8 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=20261117a"></script>
-  <script src="js/gs-sync.js?v=20261117a"></script>
-  <script src="js/admin.js?v=20261117a"></script>
+  <script src="js/api.js?v=20261117b"></script>
+  <script src="js/gs-sync.js?v=20261117b"></script>
+  <script src="js/admin.js?v=20261117b"></script>
 </body>
 </html>

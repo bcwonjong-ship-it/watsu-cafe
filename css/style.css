@@ -2377,6 +2377,99 @@ body {
   animation: pulse 2s infinite;
 }
 
+/* ============================================
+   ★ v14: 방/기기별 현황판 (관리자) + 대기 미리보기 (키오스크/모바일)
+   ============================================ */
+.fac-status-hint { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-left: 4px; }
+.fac-st-badge.wait { background: var(--accent-purple-light); color: #7C3AED; }
+
+.fac-st-card.fac-board { grid-column: 1 / -1; }
+.fac-st-card.fac-board[data-cols="1"] { grid-column: auto; }
+
+.room-grid { display: grid; gap: 10px; }
+.room-grid.cols-1 { grid-template-columns: 1fr; }
+.room-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.room-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.room-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+.room-cell {
+  background: #fff; border: 1.5px solid var(--border); border-radius: 12px;
+  padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0;
+}
+.room-cell.used { border-color: #C7D2FE; background: #F8FAFF; }
+.room-cell.free { border-style: dashed; }
+.room-cell.fastest { border-color: #F59E0B; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15); }
+.room-cell-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.room-cell-name { font-weight: 800; color: var(--secondary); font-size: 0.92rem; }
+.room-cell-state { font-size: 0.68rem; font-weight: 800; padding: 2px 8px; border-radius: 10px; background: var(--accent-mint-light); color: #0F9F94; }
+.room-cell.used .room-cell-state { background: var(--primary-light); color: var(--primary); }
+.room-fastest-tag { font-size: 0.7rem; font-weight: 800; color: #B45309; background: #FEF3C7; border-radius: 6px; padding: 3px 6px; text-align: center; }
+.room-empty { font-size: 0.8rem; color: #0F9F94; font-weight: 700; text-align: center; padding: 10px 0; }
+
+.room-user { background: #fff; border: 1px solid var(--border-light); border-radius: 8px; padding: 8px; }
+.room-user-main { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.room-user-name { font-weight: 800; color: var(--text-primary); font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-user-sub { font-size: 0.7rem; color: var(--text-muted); margin-top: 3px; }
+.room-user-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+.room-btn {
+  border: none; border-radius: 6px; cursor: pointer; font-family: inherit;
+  font-size: 0.72rem; font-weight: 700; padding: 5px 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; transition: 0.15s;
+}
+.room-user-actions .room-btn { flex: 1; }
+.room-btn.adj { background: var(--primary-light); color: var(--primary); }
+.room-btn.adj:hover { background: var(--primary); color: #fff; }
+.room-btn.stop { background: var(--accent-pink-light); color: var(--accent-pink); }
+.room-btn.stop:hover { background: var(--accent-pink); color: #fff; }
+.room-btn.start { background: var(--primary-light); color: var(--primary); width: 24px; height: 24px; padding: 0; }
+.room-btn.start:hover { background: var(--primary); color: #fff; }
+.room-btn.cancel { background: #F3F4F6; color: #9CA3AF; width: 24px; height: 24px; padding: 0; }
+.room-btn.cancel:hover { background: var(--accent-pink); color: #fff; }
+
+.room-wait-box { border-top: 1px dashed var(--border); padding-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.room-wait-box.extra { margin-top: 10px; border: 1px dashed var(--border); border-radius: 8px; padding: 8px; }
+.room-wait-title { font-size: 0.72rem; font-weight: 800; color: #7C3AED; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.room-wait-title .room-wait-next { font-weight: 600; color: var(--text-muted); font-size: 0.66rem; }
+.room-wait-none { font-size: 0.72rem; color: var(--text-muted); }
+.room-wait-item { display: flex; align-items: center; gap: 5px; font-size: 0.74rem; background: #FAF8FF; border-radius: 6px; padding: 4px 6px; }
+.room-wait-num { width: 18px; height: 18px; border-radius: 50%; background: var(--accent-purple); color: #fff; font-size: 0.64rem; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.room-wait-name { flex: 1; min-width: 0; font-weight: 700; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-wait-elapsed { color: var(--text-muted); font-size: 0.66rem; white-space: nowrap; }
+.room-wait-est { color: #7C3AED; font-weight: 800; font-size: 0.68rem; white-space: nowrap; }
+.room-wait-actions { display: flex; gap: 3px; }
+
+@media (max-width: 1100px) {
+  .room-grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .room-grid.cols-3, .room-grid.cols-4, .room-grid.cols-2 { grid-template-columns: 1fr; }
+}
+
+/* 시간 ± 조정 팝업 */
+.time-adj-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.time-adj-quick { border: none; border-radius: 8px; padding: 8px 12px; font-weight: 800; font-size: 0.88rem; cursor: pointer; font-family: inherit; }
+.time-adj-quick.plus { background: #E8EFFF; color: #4F7BF7; }
+.time-adj-quick.minus { background: #FFE5EE; color: #FF6B9D; }
+
+/* 키오스크 방 카드 — 대기 정보 */
+.facility-card.room-card { gap: 5px; padding: 16px 12px; }
+.facility-card.room-card .room-wait-info { display: flex; flex-direction: column; gap: 2px; font-size: 0.74rem; }
+.facility-card.room-card .room-wait-count { color: #7C3AED; font-weight: 800; }
+.facility-card.room-card .room-wait-next { color: #5A4A7A; font-weight: 600; }
+.facility-card.room-card .room-wait-next b { color: #4F7BF7; }
+.facility-card.room-card .room-free-tag { font-size: 0.74rem; color: #0F9F94; font-weight: 800; }
+.facility-card.room-card.fastest { border-color: #F59E0B !important; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); opacity: 1; }
+
+/* 대기 등록 전 미리보기 (키오스크/모바일 공통) */
+.wait-preview { margin: 8px 0 12px; padding: 12px; background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 10px; }
+.wait-preview p { margin: 0; }
+.wait-preview-num { font-size: 1.1rem; color: #162443; }
+.wait-preview-num b { color: #4F7BF7; font-size: 1.3rem; }
+.wait-preview-time { margin-top: 6px !important; color: #7C3AED; font-weight: 700; }
+.wait-preview-detail { margin-top: 6px !important; font-size: 0.8rem; color: #6B7280; }
+.m-room-next { font-size: 0.68rem; color: #7C3AED; font-weight: 700; }
+
 /* ★ 관리자 예약 현황 패널 (v11 — 시간표 그리드) */
 .admin-reserve-panel {
   background: #fff;

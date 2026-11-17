@@ -112,6 +112,7 @@ async function submitSearch() {
     if (!AdminAuth.login(AdminAuth.ADMIN_ID, pw)) {
       return Swal.fire({ title: '로그인 실패', text: '비밀번호가 올바르지 않습니다.', icon: 'error' });
     }
+    AdminAuth.markVerified(pw); // ★ v14: 이용자관리/현황판 재인증 생략
     // 관리자 입장 처리 (실적 미카운트)
     Util.showLoading(true);
     try {
@@ -126,7 +127,7 @@ async function submitSearch() {
       if (wcEl) wcEl.textContent = '관리자';
       await Swal.fire({
         title: '🔒 관리자 모드',
-        html: '<p>관리자로 입장합니다.</p><p style="font-size:0.85rem;color:#6B5B8A;">실적 카운트 제외 · 운영시간 제한 없음</p>',
+        html: '<p>관리자로 입장합니다.</p><p style="font-size:0.85rem;color:#6B5B8A;">실적 카운트 제외 · 운영시간/휴관일 제한 없음 · 중복 예약 가능</p>',
         icon: 'success', confirmButtonColor: '#9B87F5', timer: 2000, timerProgressBar: true
       });
       showView('view-choice');
@@ -472,12 +473,18 @@ async function doWait(facility, detail = '') {
       return Swal.fire({ title: '알림', text: res.message, icon: 'warning', confirmButtonColor: '#4F7BF7' });
     }
 
+    // ★ v14: 대기 번호 + 예상 대기시간 안내
+    const estLine = res.estimateMin > 0
+      ? `<p style="margin:6px 0 0;font-size:1rem;color:#7C3AED;font-weight:700;">⏱ 예상 대기시간 약 ${res.estimateMin}분</p>`
+      : '<p style="margin:6px 0 0;font-size:0.95rem;color:#059669;font-weight:700;">곧 이용 가능합니다</p>';
     await Swal.fire({
       title: '대기 등록 완료! ⏳',
-      text: res.message,
+      html: `<p style="margin:0;"><b>${escapeHtml(facility)} ${escapeHtml(detail || '')}</b></p>
+        <p style="margin:10px 0 0;font-size:1.5rem;font-weight:900;color:#4F7BF7;">대기 ${res.queueNumber}번</p>${estLine}
+        <p style="margin:10px 0 0;font-size:0.8rem;color:#9CA3AF;">앞 순서 이용이 끝나면 자동으로 이용이 시작됩니다</p>`,
       icon: 'success',
       confirmButtonColor: '#9B87F5',
-      timer: 2500,
+      timer: 4000,
       timerProgressBar: true
     });
     goHome();
@@ -502,47 +509,65 @@ async function showSubMenu(title, subs) {
     const container = document.getElementById('sub-buttons');
     container.innerHTML = '';
 
+    // ★ v14: 방/기기별 실시간 현황 (이용중 여부 · 남은시간 · 대기 인원 · 지금 대기 시 번호/예상시간)
+    let board = null;
+    try { board = await Service.getFacilityBoard(); } catch (e) { /* 실패 시 기본 표시 */ }
+    const facBoard = board && board[title];
+
+    // 가장 빨리 이용 가능한 방 찾기 (모두 사용 중일 때 안내)
+    let fastest = null;
+    if (facBoard) {
+      facBoard.subs.forEach(sb => {
+        const eta = sb.reserve ? sb.nextEstimate : (sb.waits.length > 0 ? sb.nextEstimate : 0);
+        if (!fastest || eta < fastest.eta) fastest = { name: sb.name, eta };
+      });
+    }
+
     subs.forEach(s => {
       const full = `${title} ${s}`;
-      const isOccupied = occupied.includes(full);
-      const waitCount = waitCounts[full] || 0;
+      const sb = facBoard ? facBoard.subs.find(x => x.name === s) : null;
+      const isOccupied = sb ? !!sb.reserve : occupied.includes(full);
+      const waitCount = sb ? sb.waits.length : (waitCounts[full] || 0);
+      const nextQueue = sb ? sb.nextQueue : waitCount + 1;
+      const nextEst = sb ? sb.nextEstimate : 0;
+      const remain = sb ? sb.remain : 0;
+      const isFastest = isOccupied && fastest && fastest.name === s && facBoard.subs.every(x => !!x.reserve);
+
       const btn = document.createElement('button');
-      btn.className = 'facility-card' + (isOccupied ? ' occupied-faded' : '');
+      btn.className = 'facility-card room-card' + (isOccupied ? ' occupied-faded' : '') + (isFastest ? ' fastest' : '');
 
       if (isOccupied && config && config.hasWaitlist) {
         btn.innerHTML = `
           <span class="emoji">🔒</span>
-          <span class="label">${s}</span>
-          <span class="tag-occupied">사용 중</span>
-          ${waitCount > 0 
-            ? `<span class="tag-wait-available">⏳ 대기 ${waitCount}명</span>` 
-            : '<span class="tag-wait-available">⏳ 대기 가능</span>'}
+          <span class="label">${escapeHtml(s)}</span>
+          <span class="tag-occupied">사용 중${remain > 0 ? ` · ${remain}분 남음` : ''}</span>
+          <span class="room-wait-info">
+            <span class="room-wait-count">대기 ${waitCount}명</span>
+            <span class="room-wait-next">지금 대기 시 <b>${nextQueue}번</b> · 약 <b>${nextEst}분</b></span>
+          </span>
+          ${isFastest ? '<span class="room-fastest-tag">⚡ 가장 빨리 이용 가능</span>' : ''}
         `;
         btn.onclick = async () => {
-          // ★ v12f: 대기 예상시간 조회 후 표시
-          Util.showLoading(true);
-          let estHtml = '';
-          try {
-            const est = await Service.getWaitEstimate(title, s);
-            const parts = [];
-            if (est.hasActiveUser && est.currentRemain > 0) {
-              parts.push(`현재 이용자 남은시간: <b>약 ${est.currentRemain}분</b>`);
-            }
-            if (est.aheadCount > 0) {
-              parts.push(`앞 대기자: <b>${est.aheadCount}명</b> (1인당 ${est.baseTime}분)`);
-            }
-            if (est.estimateMin > 0) {
-              estHtml = `<div style="margin:10px 0;padding:10px;background:#F5F3FF;border-radius:8px;border:1px solid #DDD6FE;">
-                <p style="margin:0 0 4px;font-weight:700;color:#7C3AED;">⏱ 예상 대기시간: 약 ${est.estimateMin}분</p>
-                <p style="margin:0;font-size:0.8rem;color:#6B7280;">${parts.join('<br>')}</p>
-              </div>`;
-            }
-          } catch(e) { /* 예상시간 조회 실패해도 대기 등록은 가능 */ }
-          Util.showLoading(false);
-
+          // ★ v14: 관리자는 사용 중이어도 중복 예약 가능
+          if (userData.isAdmin) {
+            const ar = await Swal.fire({
+              title: `${s} 사용 중`,
+              html: `<p>현재 이용 중인 공간입니다.</p><p style="font-size:0.85rem;color:#6B7280;">관리자는 중복 예약할 수 있습니다.</p>`,
+              icon: 'question', showCancelButton: true, showDenyButton: true,
+              confirmButtonText: '🔐 중복 예약', denyButtonText: '⏳ 대기 등록', cancelButtonText: '취소',
+              confirmButtonColor: '#9B87F5', denyButtonColor: '#4F7BF7'
+            });
+            if (ar.isConfirmed) return doReserve(title, s);
+            if (ar.isDenied) return doWait(title, s);
+            return;
+          }
           const r = await Swal.fire({
             title: `${s} 사용 중`,
-            html: `<p>현재 사용 중입니다.</p>${waitCount > 0 ? `<p>현재 대기 <b>${waitCount}</b>명</p>` : ''}${estHtml}<p>대기 등록하시겠습니까?</p>`,
+            html: `<div class="wait-preview">
+                <p class="wait-preview-num">지금 등록하면 <b>대기 ${nextQueue}번</b></p>
+                <p class="wait-preview-time">⏱ 예상 대기시간 <b>약 ${nextEst}분</b></p>
+                <p class="wait-preview-detail">현재 이용자 남은시간 약 ${remain}분${waitCount > 0 ? ` · 앞 대기자 ${waitCount}명 (1인당 ${facBoard ? facBoard.baseTime : FacilityConfig.getTimeLimit(title)}분)` : ''}</p>
+              </div><p>대기 등록하시겠습니까?</p>`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: '⏳ 대기 등록',
@@ -552,19 +577,21 @@ async function showSubMenu(title, subs) {
           if (r.isConfirmed) await doWait(title, s);
         };
       } else if (isOccupied) {
-        btn.classList.add('occupied');
+        btn.classList.add(userData.isAdmin ? 'occupied-faded' : 'occupied');
         btn.innerHTML = `
           <span class="emoji">🔒</span>
-          <span class="label">${s}</span>
+          <span class="label">${escapeHtml(s)}</span>
           <span class="tag-occupied">사용 중</span>
         `;
-        btn.onclick = () => Swal.fire({ title: '알림', text: '현재 사용 중인 공간입니다.', icon: 'info' });
+        btn.onclick = userData.isAdmin
+          ? () => doReserve(title, s)
+          : () => Swal.fire({ title: '알림', text: '현재 사용 중인 공간입니다.', icon: 'info' });
       } else {
-        // ★ 비어있어도 대기 인원수 표시
         const waitBadge = waitCount > 0 ? `<span class="wait-count-badge-sm">대기 ${waitCount}명</span>` : '';
         btn.innerHTML = `
           <span class="emoji">✨</span>
-          <span class="label">${s}</span>
+          <span class="label">${escapeHtml(s)}</span>
+          <span class="room-free-tag">바로 이용 가능</span>
           ${waitBadge}
         `;
         btn.onclick = () => doReserve(title, s);
@@ -763,7 +790,10 @@ async function checkMyReservation() {
     if (myWaits.length > 0) {
       html += '<div style="margin-top:12px;margin-bottom:8px;font-weight:700;color:#9B87F5;">⏳ 대기 중인 시설</div>';
       html += myWaits.map(w => {
-        const statusText = w.status === 'called' ? '<span style="color:#FF6B9D;font-weight:700;">🔔 호출됨! 관리자에게 확인해주세요</span>' : `대기 ${w.queue_number}번`;
+        // ★ v14: 실시간 순번 + 예상 대기시간
+        const pos = w.live_position || w.queue_number;
+        const est = (w.est_min !== undefined) ? ` <span style="color:#7C3AED;">(약 ${w.est_min}분)</span>` : '';
+        const statusText = w.status === 'called' ? '<span style="color:#FF6B9D;font-weight:700;">🔔 호출됨! 관리자에게 확인해주세요</span>' : `대기 ${pos}번${est}`;
         return `<div style="padding:8px 0; border-bottom:1px solid #eee;">
           <strong>${w.facility}</strong> ${w.detail && w.detail !== '-' ? w.detail : ''} - ${statusText}
         </div>`;
@@ -869,7 +899,12 @@ function closeRegModal() {
 }
 
 // ===== 관리자 인증 후 페이지 이동 =====
+// ★ v14: 한 번 인증하면 같은 세션 동안 이용자관리/관리자(현황판) 이동 시 재인증 생략
 async function authAndGo(url) {
+  if (AdminAuth.isVerified()) {
+    window.location.href = url;
+    return;
+  }
   const { value: pw } = await Swal.fire({
     title: '🔒 관리자 인증',
     input: 'password',
@@ -882,9 +917,10 @@ async function authAndGo(url) {
     inputAttributes: { autocomplete: 'off' }
   });
   if (!pw) return;
-  if (pw !== 'admin1388!') {
+  if (pw !== AdminAuth.ADMIN_PW) {
     return Swal.fire({ title: '인증 실패', text: '인증번호가 올바르지 않습니다.', icon: 'error' });
   }
+  AdminAuth.markVerified(pw);
   window.location.href = url;
 }
 

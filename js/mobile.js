@@ -159,7 +159,10 @@ async function mRefreshWaitlist() {
             </button>
           </div>`;
       } else {
-        statusHtml = `<span class="m-time-remain">대기 ${w.queue_number}번</span>`;
+        // ★ v14: 실시간 순번 + 예상 대기시간
+        const pos = w.live_position || w.queue_number;
+        const est = (w.est_min !== undefined) ? ` · 약 ${w.est_min}분` : '';
+        statusHtml = `<span class="m-time-remain">대기 ${pos}번${est}</span>`;
         actionHtml = `
           <button class="m-exit-facility-btn" onclick="mCancelWait('${w.id}')">
             <i class="fas fa-times"></i> 취소
@@ -302,7 +305,14 @@ async function mJoinWait(facility, detail = '') {
     if (res.status === 'error') {
       return Swal.fire({ title: '알림', text: res.message, icon: 'warning', confirmButtonColor: '#4F7BF7' });
     }
-    await Swal.fire({ title: '대기 등록! ⏳', text: res.message, icon: 'success', confirmButtonColor: '#9B87F5', timer: 2000, timerProgressBar: true });
+    // ★ v14: 대기 번호 + 예상 대기시간 안내
+    await Swal.fire({
+      title: '대기 등록! ⏳',
+      html: `<p style="margin:0;"><b>${facility} ${detail || ''}</b></p>
+        <p style="margin:10px 0 0;font-size:1.4rem;font-weight:900;color:#4F7BF7;">대기 ${res.queueNumber}번</p>
+        <p style="margin:6px 0 0;color:#7C3AED;font-weight:700;">${res.estimateMin > 0 ? `⏱ 예상 대기시간 약 ${res.estimateMin}분` : '곧 이용 가능합니다'}</p>`,
+      icon: 'success', confirmButtonColor: '#9B87F5', timer: 3500, timerProgressBar: true
+    });
     await mRefreshAll();
     mShowView('m-view-dashboard');
   } catch (e) {
@@ -326,10 +336,19 @@ async function mShowSubMenu(title, subs) {
     container.innerHTML = '';
     const config = FacilityConfig.facilities[title];
 
+    // ★ v14: 방/기기별 대기 번호·예상시간을 등록 전에 바로 표시
+    let board = null;
+    try { board = await Service.getFacilityBoard(); } catch (e) { /* ignore */ }
+    const facBoard = board && board[title];
+
     subs.forEach(s => {
       const full = `${title} ${s}`;
-      const isOccupied = occupied.includes(full);
-      const waitCount = waitCounts[full] || 0;
+      const sb = facBoard ? facBoard.subs.find(x => x.name === s) : null;
+      const isOccupied = sb ? !!sb.reserve : occupied.includes(full);
+      const waitCount = sb ? sb.waits.length : (waitCounts[full] || 0);
+      const nextQueue = sb ? sb.nextQueue : waitCount + 1;
+      const nextEst = sb ? sb.nextEstimate : 0;
+      const remain = sb ? sb.remain : 0;
       const btn = document.createElement('button');
       btn.className = 'm-facility-btn' + (isOccupied ? ' occupied-visual' : '');
 
@@ -337,34 +356,20 @@ async function mShowSubMenu(title, subs) {
         btn.innerHTML = `
           <span class="m-fac-icon">🔒</span>
           <span class="m-fac-name">${s}</span>
-          <span class="m-tag-occupied">사용 중</span>
-          ${waitCount > 0 ? `<span class="m-tag-wait">대기 ${waitCount}명</span>` : '<span class="m-tag-wait-available">대기 가능</span>'}
+          <span class="m-tag-occupied">사용 중${remain > 0 ? ` · ${remain}분` : ''}</span>
+          <span class="m-tag-wait">대기 ${waitCount}명</span>
+          <span class="m-room-next">등록 시 ${nextQueue}번 · 약 ${nextEst}분</span>
         `;
         btn.onclick = async () => {
-          // ★ v12f: 대기 예상시간 조회 후 표시
-          Util.showLoading(true);
-          let estHtml = '';
-          try {
-            const est = await Service.getWaitEstimate(title, s);
-            const parts = [];
-            if (est.hasActiveUser && est.currentRemain > 0) {
-              parts.push(`현재 이용자 남은시간: <b>약 ${est.currentRemain}분</b>`);
-            }
-            if (est.aheadCount > 0) {
-              parts.push(`앞 대기자: <b>${est.aheadCount}명</b> (1인당 ${est.baseTime}분)`);
-            }
-            if (est.estimateMin > 0) {
-              estHtml = `<div style="margin:10px 0;padding:10px;background:#F5F3FF;border-radius:8px;border:1px solid #DDD6FE;">
-                <p style="margin:0 0 4px;font-weight:700;color:#7C3AED;">⏱ 예상 대기시간: 약 ${est.estimateMin}분</p>
-                <p style="margin:0;font-size:0.8rem;color:#6B7280;">${parts.join('<br>')}</p>
-              </div>`;
-            }
-          } catch(e) { /* 예상시간 조회 실패해도 대기 등록은 가능 */ }
-          Util.showLoading(false);
+          const estHtml = `<div class="wait-preview">
+              <p class="wait-preview-num">지금 등록하면 <b>대기 ${nextQueue}번</b></p>
+              <p class="wait-preview-time">⏱ 예상 대기시간 <b>약 ${nextEst}분</b></p>
+              <p class="wait-preview-detail">현재 이용자 남은시간 약 ${remain}분${waitCount > 0 ? ` · 앞 대기자 ${waitCount}명` : ''}</p>
+            </div>`;
 
           const r = await Swal.fire({
             title: `${s} 사용 중`,
-            html: `현재 사용 중입니다.${waitCount > 0 ? `<br>현재 대기 ${waitCount}명` : ''}${estHtml}<br>대기 등록하시겠습니까?`,
+            html: `${estHtml}대기 등록하시겠습니까?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: '⏳ 대기 등록',

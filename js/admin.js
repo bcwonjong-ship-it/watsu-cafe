@@ -116,7 +116,7 @@ function renderUsers(users) {
           else { timeInfo = `<span class="time-over">(${Math.abs(remain)}분 초과!)</span>`; timeClass = ' overdue'; }
         }
 
-        let extendBtn = `<button class="admin-action-btn extend" onclick="event.stopPropagation(); extendTime('${r.id}', '${escapeHtml(r.facility)}')"><i class="fas fa-plus-circle"></i> 연장</button>`;
+        let extendBtn = `<button class="admin-action-btn extend" onclick="event.stopPropagation(); extendTime('${r.id}', '${escapeHtml(r.facility)}')"><i class="fas fa-clock"></i> 시간 ±</button>`;
 
         return `<div class="facility-item${timeClass}">
           <span class="fac-item-icon">${icon}</span>
@@ -265,33 +265,40 @@ async function exitSingleFacility(reservationId, facilityName) {
   if (!r.isConfirmed) return;
   Util.showLoading(true);
   try {
-    await Service.exitFacility(reservationId);
+    const res = await Service.exitFacility(reservationId);
     Util.showLoading(false);
+    // ★ v14: 대기 1순위 자동 이용시작 안내
+    if (res && res.promoted) {
+      const p = res.promoted;
+      Swal.fire({
+        title: '다음 대기자 이용 시작 ✅',
+        html: `<p><b>${escapeHtml(p.name)}</b>님의<br>${escapeHtml(p.facility)} ${p.detail !== '-' ? escapeHtml(p.detail) : ''} 이용이 자동으로 시작되었습니다.</p>`,
+        icon: 'success', timer: 2500, timerProgressBar: true, confirmButtonColor: '#4F7BF7'
+      });
+    }
     loadData();
   } catch (e) { Util.showLoading(false); Swal.fire({ title: '오류', icon: 'error' }); }
 }
 
+// ★ v14: 시간 연장(+) / 단축(−) 모두 지원
 async function extendTime(reservationId, facilityName) {
+  const qb = (v, minus) => `<button type="button" class="time-adj-quick ${minus ? 'minus' : 'plus'}" onclick="document.getElementById('extend-min').value=${v}">${v > 0 ? '+' : '−'}${Math.abs(v)}분</button>`;
   const r = await Swal.fire({
-    title: `${facilityName} 시간 연장`,
+    title: `${facilityName} 시간 조정`,
     html: `
-      <p style="margin-bottom:14px;">연장할 시간(분)을 입력하세요</p>
-      <div style="display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap;">
-        <button type="button" class="swal2-styled" style="background:#E8EFFF;color:#4F7BF7;font-weight:700;padding:8px 14px;border-radius:8px;font-size:0.9rem;border:none;cursor:pointer;" onclick="document.getElementById('extend-min').value=10">10분</button>
-        <button type="button" class="swal2-styled" style="background:#E8EFFF;color:#4F7BF7;font-weight:700;padding:8px 14px;border-radius:8px;font-size:0.9rem;border:none;cursor:pointer;" onclick="document.getElementById('extend-min').value=20">20분</button>
-        <button type="button" class="swal2-styled" style="background:#E8EFFF;color:#4F7BF7;font-weight:700;padding:8px 14px;border-radius:8px;font-size:0.9rem;border:none;cursor:pointer;" onclick="document.getElementById('extend-min').value=30">30분</button>
-        <button type="button" class="swal2-styled" style="background:#F3EFFF;color:#9B87F5;font-weight:700;padding:8px 14px;border-radius:8px;font-size:0.9rem;border:none;cursor:pointer;" onclick="document.getElementById('extend-min').value=60">60분</button>
-      </div>
-      <input id="extend-min" type="number" min="10" max="180" step="10" value="10"
+      <p style="margin-bottom:14px;">늘릴 시간은 <b style="color:#4F7BF7;">+</b>, 줄일 시간은 <b style="color:#FF6B9D;">−</b> 값으로 입력하세요</p>
+      <div class="time-adj-row">${qb(-30, true)}${qb(-20, true)}${qb(-10, true)}${qb(-5, true)}</div>
+      <div class="time-adj-row" style="margin-top:8px;">${qb(10)}${qb(20)}${qb(30)}${qb(60)}</div>
+      <input id="extend-min" type="number" min="-180" max="180" step="5" value="10"
         style="width:120px;text-align:center;font-size:1.4rem;font-weight:800;padding:12px;border:2px solid #E5E7EB;border-radius:10px;margin-top:14px;color:#162443;"
         onclick="this.select()">
       <span style="font-size:1.1rem;font-weight:700;color:#6B7280;margin-left:6px;">분</span>
     `,
     icon: 'question', showCancelButton: true,
-    confirmButtonText: '연장', cancelButtonText: '취소', confirmButtonColor: '#4F7BF7',
+    confirmButtonText: '적용', cancelButtonText: '취소', confirmButtonColor: '#4F7BF7',
     preConfirm: () => {
       const val = parseInt(document.getElementById('extend-min').value, 10);
-      if (!val || val < 10) { Swal.showValidationMessage('10분 이상 입력해주세요'); return false; }
+      if (!val) { Swal.showValidationMessage('0이 아닌 값을 입력해주세요 (예: 10 또는 -10)'); return false; }
       return val;
     }
   });
@@ -302,8 +309,10 @@ async function extendTime(reservationId, facilityName) {
     Util.showLoading(false);
     if (res.status === 'success') {
       alertedReservations.delete(reservationId);
-      Swal.fire({ title: '연장 완료!', text: res.message, icon: 'success', timer: 1500, confirmButtonColor: '#4F7BF7' });
+      Swal.fire({ title: '시간 조정 완료!', text: res.message, icon: 'success', timer: 1500, confirmButtonColor: '#4F7BF7' });
       loadData();
+    } else {
+      Swal.fire({ title: '알림', text: res.message, icon: 'warning', confirmButtonColor: '#4F7BF7' });
     }
   } catch (e) { Util.showLoading(false); Swal.fire({ title: '오류', icon: 'error' }); }
 }
@@ -349,17 +358,9 @@ async function loadWaitlists() {
           const waitMs = w.created_at ? (nowMs - w.created_at) : 0;
           const waitMin = Math.max(0, Math.floor(waitMs / 60000));
           const waitTimeHtml = waitMin > 0 ? `<span class="waitlist-elapsed"><i class="fas fa-hourglass-half"></i> ${waitMin}분 대기</span>` : `<span class="waitlist-elapsed just-now"><i class="fas fa-hourglass-start"></i> 방금</span>`;
-          if (w.status === 'called') {
-            const calledMs = w.called_at ? (nowMs - w.called_at) : 0;
-            const calledMin = Math.max(0, Math.floor(calledMs / 60000));
-            const calledTimeStr = calledMin > 0 ? ` (${calledMin}분 전)` : ' (방금)';
-            statusBadge = `<span class="waitlist-called-badge"><i class="fas fa-bell"></i> 호출됨${calledTimeStr}</span>`;
-            actionBtns = `<button class="admin-action-btn extend" onclick="adminForceConfirm('${w.id}')"><i class="fas fa-play-circle"></i> 이용시작</button>
-              <button class="admin-action-btn exit-fac" onclick="cancelWaitEntry('${w.id}')"><i class="fas fa-times"></i> 취소</button>`;
-          } else {
-            actionBtns = `<button class="admin-action-btn extend" onclick="callWaitEntry('${w.id}')"><i class="fas fa-bullhorn"></i> 호출</button>
-              <button class="admin-action-btn exit-fac" onclick="cancelWaitEntry('${w.id}')"><i class="fas fa-times"></i> 취소</button>`;
-          }
+          // ★ v14: 호출 버튼 제거 — 이용시작 / 취소만
+          actionBtns = `<button class="admin-action-btn extend" onclick="adminForceConfirm('${w.id}')"><i class="fas fa-play-circle"></i> 이용시작</button>
+            <button class="admin-action-btn exit-fac" onclick="cancelWaitEntry('${w.id}')"><i class="fas fa-times"></i> 취소</button>`;
           return `<div class="waitlist-item ${w.status === 'called' ? 'called' : ''}">
             <span class="waitlist-num">${i + 1}</span>
             <div class="waitlist-info"><span class="waitlist-name">${escapeHtml(w.name)}</span><span class="waitlist-phone">${Util.formatPhone(w.phone)}</span>${waitTimeHtml}</div>
@@ -914,7 +915,129 @@ async function doExport(type) {
 // ======================================================================
 // ===== ★ 시설별 이용현황 패널 (v10.1 — 종료버튼 + 대기목록 통합) =====
 // ======================================================================
+// ★ v14: 방/기기별 현황판 — 방마다 이용자·이용시간·시간±·이용중지 + 방별 대기자(순서·대기시간·예상시간)
 async function loadFacilityStatus() {
+  const grid = document.getElementById('facility-status-grid');
+  if (!grid) return;
+
+  try {
+    const board = await Service.getFacilityBoard();
+    const remainTag = (r) => {
+      const tLimit = parseInt(r.time_limit, 10) || 0;
+      const elapsed = r.entry_time ? Util.getElapsedMinutes(r.entry_time) : 0;
+      if (tLimit <= 0) return `<span class="fac-st-time ok">${elapsed}분 이용</span>`;
+      const remain = tLimit - elapsed;
+      return remain > 0
+        ? `<span class="fac-st-time ok">${remain}분 남음</span>`
+        : `<span class="fac-st-time over">${Math.abs(remain)}분 초과</span>`;
+    };
+    const userRow = (r, facName) => `
+      <div class="room-user">
+        <div class="room-user-main">
+          <span class="room-user-name">${escapeHtml(r.name || '이용자')}</span>
+          ${remainTag(r)}
+        </div>
+        <div class="room-user-sub"><i class="far fa-clock"></i> ${(r.entry_time || '').substring(0, 5)} 시작 · 제한 ${parseInt(r.time_limit, 10) || 0}분</div>
+        <div class="room-user-actions">
+          <button class="room-btn adj" onclick="extendTime('${r.id}', '${escapeHtml(facName)}')"><i class="fas fa-clock"></i> 시간 ±</button>
+          <button class="room-btn stop" onclick="exitSingleFacility('${r.id}', '${escapeHtml(facName)}')"><i class="fas fa-stop-circle"></i> 이용중지</button>
+        </div>
+      </div>`;
+    const waitRow = (w) => `
+      <div class="room-wait-item">
+        <span class="room-wait-num">${w.position}</span>
+        <span class="room-wait-name">${escapeHtml(w.name)}</span>
+        <span class="room-wait-elapsed" title="대기한 시간"><i class="fas fa-hourglass-half"></i> ${w.waitedMin > 0 ? w.waitedMin + '분' : '방금'}</span>
+        <span class="room-wait-est" title="예상 대기시간">⏱ 약 ${w.estMin}분</span>
+        <span class="room-wait-actions">
+          <button class="room-btn start" onclick="adminForceConfirm('${w.id}')" title="이용시작"><i class="fas fa-play"></i></button>
+          <button class="room-btn cancel" onclick="cancelWaitEntry('${w.id}')" title="대기 취소"><i class="fas fa-times"></i></button>
+        </span>
+      </div>`;
+
+    let html = '';
+    for (const [facName, fb] of Object.entries(board)) {
+      const config = fb.config;
+      if (config.adminOnly) continue;
+
+      // 보드게임 등 세부 공간이 없는 시설 → 기존 방식 유지
+      if (fb.subs.length === 0) {
+        const list = fb.extraReserves;
+        const body = list.length > 0
+          ? list.map(r => `<div class="fac-st-sub used">
+              <span class="fac-st-sub-user">${escapeHtml(r.name || '이용자')}</span>
+              <span class="fac-st-time ok">${r.entry_time ? Util.getElapsedMinutes(r.entry_time) : 0}분</span>
+              <button class="fac-st-extend-btn" onclick="extendTime('${r.id}', '${escapeHtml(facName)}')" title="시간 ±"><i class="fas fa-clock"></i></button>
+              <button class="fac-st-exit-btn" onclick="exitSingleFacility('${r.id}', '${escapeHtml(facName)}')"><i class="fas fa-stop-circle"></i></button>
+            </div>`).join('')
+          : '<div class="fac-st-sub empty"><span class="fac-st-sub-user">이용자 없음</span></div>';
+        html += `<div class="fac-st-card ${list.length ? 'partial' : 'free'} fac-board-simple">
+          <div class="fac-st-header"><span class="fac-st-icon">${config.icon}</span><span class="fac-st-name">${facName}</span>
+          <span class="fac-st-badge ${list.length ? 'partial' : 'free'}">${list.length}명</span></div>
+          <div class="fac-st-subs">${body}</div></div>`;
+        continue;
+      }
+
+      const usedCount = fb.subs.filter(s => s.reserve).length;
+      const total = fb.subs.length;
+      const statusClass = usedCount === 0 ? 'free' : (usedCount >= total ? 'full' : 'partial');
+      const waitTotal = fb.subs.reduce((n, s) => n + s.waits.length, 0) + fb.extraWaits.length;
+
+      // 모두 사용 중일 때 가장 빨리 비는 방 표시
+      let fastestName = '';
+      if (usedCount >= total) {
+        const best = fb.subs.slice().sort((a, b) => a.nextEstimate - b.nextEstimate)[0];
+        if (best) fastestName = best.name;
+      }
+
+      const roomsHtml = fb.subs.map(sb => {
+        const used = !!sb.reserve;
+        const usersHtml = used
+          ? sb.reserves.map(r => userRow(r, facName)).join('')
+          : '<div class="room-empty">비어있음 · 바로 이용 가능</div>';
+        const waitsHtml = sb.waits.length > 0
+          ? sb.waits.map(waitRow).join('')
+          : '<div class="room-wait-none">대기자 없음</div>';
+        return `<div class="room-cell ${used ? 'used' : 'free'} ${fastestName === sb.name ? 'fastest' : ''}">
+          <div class="room-cell-head">
+            <span class="room-cell-name">${escapeHtml(sb.name)}</span>
+            <span class="room-cell-state">${used ? '이용중' : '비어있음'}</span>
+          </div>
+          ${fastestName === sb.name ? '<div class="room-fastest-tag">⚡ 가장 빨리 이용 가능</div>' : ''}
+          ${usersHtml}
+          <div class="room-wait-box">
+            <div class="room-wait-title"><i class="fas fa-list-ol"></i> 대기 ${sb.waits.length}명
+              <span class="room-wait-next">다음 등록 시 ${sb.nextQueue}번 · 약 ${sb.nextEstimate}분</span></div>
+            ${waitsHtml}
+          </div>
+        </div>`;
+      }).join('');
+
+      const extraHtml = fb.extraWaits.length > 0
+        ? `<div class="room-wait-box extra"><div class="room-wait-title"><i class="fas fa-list-ol"></i> 방 미지정 대기 ${fb.extraWaits.length}명</div>${fb.extraWaits.map(waitRow).join('')}</div>`
+        : '';
+
+      html += `<div class="fac-st-card fac-board ${statusClass}" data-cols="${Math.min(total, 4)}">
+        <div class="fac-st-header">
+          <span class="fac-st-icon">${config.icon}</span>
+          <span class="fac-st-name">${facName}</span>
+          <span class="fac-st-badge ${statusClass}">${usedCount}/${total} 이용</span>
+          ${waitTotal > 0 ? `<span class="fac-st-badge wait">대기 ${waitTotal}</span>` : ''}
+        </div>
+        <div class="room-grid cols-${Math.min(total, 4)}">${roomsHtml}</div>
+        ${extraHtml}
+      </div>`;
+    }
+
+    grid.innerHTML = html || '<p style="color:var(--text-muted);text-align:center;padding:20px;">시설 정보 없음</p>';
+  } catch (e) {
+    console.error('[DEBUG] loadFacilityStatus 에러:', e);
+    grid.innerHTML = `<p style="color:var(--accent-pink);text-align:center;padding:20px;">시설 현황 로딩 실패<br><span style="font-size:0.8rem;color:#9CA3AF;">${e.message || ''}</span></p>`;
+  }
+}
+
+// (구버전 시설 현황 — 사용하지 않음, 참고용 보관)
+async function _legacyLoadFacilityStatus() {
   const grid = document.getElementById('facility-status-grid');
   if (!grid) return;
 
@@ -1079,8 +1202,8 @@ async function loadAdminReserves() {
     const dayNames = ['일','월','화','수','목','금','토'];
     const isWeekend = dayOfWeek === 6;
     const isSunMon = dayOfWeek === 0 || dayOfWeek === 1;
-    // 일/월: 관리자 전용 10-20시, 토: 10-18시, 화~금: 10-20시
-    const endHour = isWeekend ? 18 : 20;
+    // ★ v14: 관리자는 휴관일·운영시간 무관 → 모든 요일 10-20시 시간표 표시
+    const endHour = 20;
     const currentHour = kst.getHours();
 
     // 시간대 슬롯 생성
@@ -1118,6 +1241,7 @@ async function loadAdminReserves() {
 
           // ★ 활성(exit_time 비어있는) 예약만 찾기 — 취소/종료된 예약은 무시하여 재예약 가능
           const reserved = facReserves.find(r => r.detail === slot.detail && isExitEmpty(r.exit_time));
+          // ★ v14: 관리자는 지난 시간대도 예약 가능 (시각적으로만 흐리게)
           const isPast = slot.hour < currentHour;
 
           if (reserved) {
@@ -1136,9 +1260,9 @@ async function loadAdminReserves() {
           } else {
             // 빈 슬롯 (종료된 예약 포함 — 재예약 가능)
             const pastClass = isPast ? ' past' : '';
-            return `<div class="arsv-slot empty${pastClass}" onclick="${isPast ? '' : `adminQuickReserve('${escapeHtml(facName)}','${slot.detail}')`}">
+            return `<div class="arsv-slot empty${pastClass}" onclick="adminQuickReserve('${escapeHtml(facName)}','${slot.detail}')">
               <div class="arsv-slot-time">${slot.label}</div>
-              <div class="arsv-slot-info">${isPast ? '-' : '<i class="fas fa-plus"></i> 예약'}</div>
+              <div class="arsv-slot-info"><i class="fas fa-plus"></i> 예약</div>
             </div>`;
           }
         }).join('');
@@ -1542,7 +1666,7 @@ async function openManualDayInput() {
 const REQ_MAX_CODE_BYTES = 200 * 1024;
 let reqCache = [];
 
-function reqPw() { return sessionStorage.getItem('req_pw') || ''; }
+function reqPw() { return sessionStorage.getItem('req_pw') || sessionStorage.getItem('export_pw') || ''; }
 
 async function ensureReqAuth() {
   if (reqPw()) return true;
