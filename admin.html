@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css?v=20260910g">
+  <link rel="stylesheet" href="css/style.css?v=20261117a">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body class="admin-body">
@@ -42,6 +42,7 @@
       <button class="admin-btn" style="background:#FF9800;" onclick="toggleSelectMode()"><i class="fas fa-check-double"></i> <span id="select-mode-text">선택 퇴장</span></button>
       <button class="admin-btn btn-all-exit" onclick="handleAllExit()"><i class="fas fa-user-slash"></i> 전체 퇴장</button>
       <button class="admin-btn" style="background:#607D8B;" onclick="openExportWithAuth()"><i class="fas fa-file-export"></i> 내보내기</button>
+      <button class="admin-btn" style="background:#8E67E8;" onclick="openRequests()"><i class="fas fa-clipboard-list"></i> 수정 요청</button>
       <a class="admin-btn" style="background:#2196F3;" href="members.html"><i class="fas fa-users-cog"></i> 이용자 관리</a>
       <a class="admin-btn btn-kiosk" href="index.html"><i class="fas fa-home"></i> 키오스크</a>
     </div>
@@ -234,8 +235,51 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=20260910g"></script>
-  <script src="js/gs-sync.js?v=20260910g"></script>
-  <script src="js/admin.js?v=20260910g"></script>
+  <!-- 수정 요청 모달 -->
+  <div id="req-modal" class="modal-overlay">
+    <div class="modal-content req-modal-wide">
+      <button class="modal-close" onclick="closeRequests()">&times;</button>
+      <h2 class="modal-title">📝 수정 요청</h2>
+      <p class="req-hint">고치거나 추가하고 싶은 내용을 적어두세요. Claude에게 "수정요청 확인해줘"라고 하면 여기 적힌 내용과 첨부 코드를 읽고 반영합니다.</p>
+
+      <div class="req-form">
+        <div class="form-group">
+          <label class="form-label" for="req-title">제목</label>
+          <input type="text" id="req-title" class="form-input" maxlength="200" placeholder="예: 대기 호출 문구를 더 크게 보이게">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="req-body">자세한 내용</label>
+          <textarea id="req-body" class="form-input req-textarea" rows="4" maxlength="20000" placeholder="어느 화면에서, 어떻게 바뀌었으면 하는지 적어주세요"></textarea>
+        </div>
+        <div class="req-row">
+          <div class="form-group">
+            <label class="form-label" for="req-priority">중요도</label>
+            <select id="req-priority" class="form-input">
+              <option>낮음</option><option selected>보통</option><option>높음</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="req-file">코드 파일 첨부 (선택)</label>
+            <input type="file" id="req-file" class="form-input" accept=".js,.html,.css,.sql,.json,.txt,.md" onchange="onReqFile(this)">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="req-code">수정한 코드 붙여넣기 (선택) <span id="req-code-name" class="req-code-name"></span></label>
+          <textarea id="req-code" class="form-input req-textarea req-code" rows="5" spellcheck="false" placeholder="수정한 코드가 있다면 여기에 붙여넣거나 위에서 파일을 선택하세요 (저장만 되고 실행되지는 않습니다)"></textarea>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="submitRequest()"><i class="fas fa-paper-plane"></i> 요청 등록</button>
+      </div>
+
+      <div class="req-list-head">
+        <strong>등록된 요청 <span id="req-count" class="req-count">0</span></strong>
+        <button class="req-refresh" onclick="loadRequests()"><i class="fas fa-sync-alt"></i> 새로고침</button>
+      </div>
+      <div id="req-list" class="req-list"></div>
+    </div>
+  </div>
+
+  <script src="js/api.js?v=20261117a"></script>
+  <script src="js/gs-sync.js?v=20261117a"></script>
+  <script src="js/admin.js?v=20261117a"></script>
 </body>
 </html>

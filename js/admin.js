@@ -1536,3 +1536,164 @@ async function openManualDayInput() {
     Swal.fire({ title: '오류', text: '저장에 실패했습니다.', icon: 'error' });
   }
 }
+
+// ===== ★ 수정 요청 (관리자 → Claude에게 전달할 메모/코드) =====
+// 서버(RPC)는 관리자 비밀번호가 맞을 때만 읽기/쓰기를 허용. 저장된 코드는 화면에 텍스트로만 보여주고 절대 실행하지 않음.
+const REQ_MAX_CODE_BYTES = 200 * 1024;
+let reqCache = [];
+
+function reqPw() { return sessionStorage.getItem('req_pw') || ''; }
+
+async function ensureReqAuth() {
+  if (reqPw()) return true;
+  const r = await Swal.fire({
+    title: '🔒 비밀번호 확인',
+    html: '<p style="color:#6B7280;">수정 요청을 보거나 등록하려면 관리자 비밀번호가 필요합니다.</p>',
+    input: 'password',
+    inputPlaceholder: '비밀번호 입력',
+    inputAttributes: { autocomplete: 'off' },
+    confirmButtonText: '확인', cancelButtonText: '취소', confirmButtonColor: '#4F7BF7',
+    showCancelButton: true,
+    showLoaderOnConfirm: true,
+    preConfirm: async (val) => {
+      try {
+        await API.rpc('admin_list_requests', { p_password: val || '' });
+        return val;
+      } catch (e) {
+        Swal.showValidationMessage('비밀번호가 올바르지 않거나 서버에 연결할 수 없습니다');
+        return false;
+      }
+    }
+  });
+  if (!r.isConfirmed) return false;
+  sessionStorage.setItem('req_pw', r.value);
+  return true;
+}
+
+async function openRequests() {
+  if (!(await ensureReqAuth())) return;
+  document.getElementById('req-modal').classList.add('active');
+  loadRequests();
+}
+
+function closeRequests() {
+  document.getElementById('req-modal').classList.remove('active');
+}
+
+async function loadRequests() {
+  const listEl = document.getElementById('req-list');
+  listEl.innerHTML = '<div class="req-empty"><i class="fas fa-spinner fa-spin"></i> 불러오는 중...</div>';
+  try {
+    reqCache = (await API.rpc('admin_list_requests', { p_password: reqPw() })) || [];
+    renderRequests();
+  } catch (e) {
+    console.error('수정 요청 조회 실패:', e);
+    sessionStorage.removeItem('req_pw');
+    listEl.innerHTML = '<div class="req-empty">불러오지 못했습니다. 창을 닫고 다시 열어 비밀번호를 확인해주세요.</div>';
+  }
+}
+
+function fmtReqDate(ms) {
+  const d = new Date(Number(ms));
+  return isNaN(d) ? '-' : d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderRequests() {
+  const listEl = document.getElementById('req-list');
+  document.getElementById('req-count').textContent = reqCache.length;
+  if (!reqCache.length) {
+    listEl.innerHTML = '<div class="req-empty">아직 등록된 요청이 없습니다.</div>';
+    return;
+  }
+  listEl.innerHTML = reqCache.map(r => {
+    const id = Number(r.id);
+    const code = r.code
+      ? `<details class="req-codebox"><summary>첨부 코드 ${r.code_name ? '· ' + escapeHtml(r.code_name) : ''} (${r.code.length.toLocaleString()}자)</summary><pre>${escapeHtml(r.code)}</pre></details>`
+      : '';
+    const resp = r.response ? `<div class="req-response"><b>처리 메모</b> ${escapeHtml(r.response)}</div>` : '';
+    const statusBtns = ['대기', '보류', '완료']
+      .filter(s => s !== r.status)
+      .map(s => `<button class="req-act" data-act="status" data-id="${id}" data-status="${s}">${s}(으)로</button>`).join('');
+    return `
+      <article class="req-item status-${escapeHtml(r.status)}">
+        <header>
+          <span class="req-badge st-${escapeHtml(r.status)}">${escapeHtml(r.status)}</span>
+          <span class="req-badge pr-${escapeHtml(r.priority)}">${escapeHtml(r.priority)}</span>
+          <span class="req-date">${fmtReqDate(r.created_at)}</span>
+        </header>
+        <h4>${escapeHtml(r.title)}</h4>
+        ${r.body ? `<p class="req-body">${escapeHtml(r.body)}</p>` : ''}
+        ${code}
+        ${resp}
+        <footer>${statusBtns}<button class="req-act danger" data-act="delete" data-id="${id}">삭제</button></footer>
+      </article>`;
+  }).join('');
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest && e.target.closest('#req-list .req-act');
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  try {
+    if (btn.dataset.act === 'delete') {
+      const c = await Swal.fire({ title: '이 요청을 삭제할까요?', text: '삭제하면 되돌릴 수 없습니다.', icon: 'warning', showCancelButton: true, confirmButtonText: '삭제', cancelButtonText: '취소', confirmButtonColor: '#EF4444' });
+      if (!c.isConfirmed) return;
+      await API.rpc('admin_delete_request', { p_password: reqPw(), p_id: id });
+    } else if (btn.dataset.act === 'status') {
+      await API.rpc('admin_set_request_status', { p_password: reqPw(), p_id: id, p_status: btn.dataset.status });
+    }
+    loadRequests();
+  } catch (err) {
+    console.error(err);
+    Swal.fire({ title: '처리 실패', text: '잠시 후 다시 시도해주세요.', icon: 'error', confirmButtonColor: '#4F7BF7' });
+  }
+});
+
+function onReqFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > REQ_MAX_CODE_BYTES) {
+    input.value = '';
+    return Swal.fire({ title: '파일이 너무 큽니다', text: '200KB 이하의 텍스트 파일만 첨부할 수 있습니다.', icon: 'warning', confirmButtonColor: '#4F7BF7' });
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = String(reader.result || '');
+    if (text.indexOf(String.fromCharCode(0)) !== -1) {
+      input.value = '';
+      return Swal.fire({ title: '텍스트 파일이 아닙니다', text: '코드(텍스트) 파일만 첨부할 수 있습니다.', icon: 'warning', confirmButtonColor: '#4F7BF7' });
+    }
+    document.getElementById('req-code').value = text;
+    document.getElementById('req-code-name').textContent = '· ' + file.name;
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+async function submitRequest() {
+  const title = document.getElementById('req-title').value.trim();
+  const body = document.getElementById('req-body').value.trim();
+  const priority = document.getElementById('req-priority').value;
+  const code = document.getElementById('req-code').value;
+  const fileInput = document.getElementById('req-file');
+  const codeName = code ? ((fileInput.files[0] && fileInput.files[0].name) || '붙여넣은 코드') : '';
+
+  if (!title) return Swal.fire({ title: '제목을 입력해주세요', icon: 'warning', confirmButtonColor: '#4F7BF7' });
+  if (new Blob([code]).size > REQ_MAX_CODE_BYTES) {
+    return Swal.fire({ title: '코드가 너무 깁니다', text: '200KB 이하로 줄여주세요.', icon: 'warning', confirmButtonColor: '#4F7BF7' });
+  }
+  Util.showLoading(true);
+  try {
+    await API.rpc('admin_add_request', { p_password: reqPw(), p_title: title, p_body: body, p_priority: priority, p_code_name: codeName, p_code: code });
+    Util.showLoading(false);
+    ['req-title', 'req-body', 'req-code'].forEach(i => { document.getElementById(i).value = ''; });
+    fileInput.value = '';
+    document.getElementById('req-code-name').textContent = '';
+    document.getElementById('req-priority').value = '보통';
+    await Swal.fire({ title: '등록 완료', text: 'Claude에게 "수정요청 확인해줘"라고 말하면 반영합니다.', icon: 'success', timer: 1800, showConfirmButton: false });
+    loadRequests();
+  } catch (e) {
+    Util.showLoading(false);
+    console.error('수정 요청 등록 실패:', e);
+    Swal.fire({ title: '등록 실패', text: '잠시 후 다시 시도해주세요.', icon: 'error', confirmButtonColor: '#4F7BF7' });
+  }
+}

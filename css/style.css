@@ -2898,3 +2898,40 @@ body {
   0%, 100% { opacity: 0.3; transform: scale(0.8); }
   50% { opacity: 1; transform: scale(1.1); }
 }
+
+/* ===== ★ 수정 요청 모달 ===== */
+.req-modal-wide { max-width: 720px; }
+.req-hint { margin: -8px 0 18px; text-align: center; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; }
+.req-form { background: var(--bg-main); border: 1px solid var(--border); border-radius: 14px; padding: 18px 16px 16px; margin-bottom: 22px; }
+.req-row { display: grid; grid-template-columns: 140px 1fr; gap: 12px; }
+.req-textarea { width: 100%; resize: vertical; line-height: 1.5; font-family: inherit; }
+.req-textarea.req-code { font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; white-space: pre; overflow: auto; }
+.req-code-name { color: var(--primary); font-weight: 700; }
+.req-list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--secondary); }
+.req-count { display: inline-block; min-width: 22px; padding: 1px 8px; border-radius: 100px; background: var(--primary-light); color: var(--primary); font-size: 0.8rem; text-align: center; margin-left: 4px; }
+.req-refresh { border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 5px 11px; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
+.req-refresh:hover { border-color: var(--primary); color: var(--primary); }
+.req-list { display: flex; flex-direction: column; gap: 12px; }
+.req-empty { text-align: center; padding: 26px 10px; color: var(--text-muted); font-size: 0.9rem; border: 1px dashed var(--border); border-radius: 12px; }
+.req-item { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; background: #fff; }
+.req-item.status-완료 { background: #F6FBF9; }
+.req-item.status-완료 h4 { color: var(--text-secondary); }
+.req-item header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.req-item h4 { margin: 0 0 4px; font-size: 1rem; color: var(--secondary); overflow-wrap: anywhere; }
+.req-body { margin: 0 0 8px; font-size: 0.88rem; color: var(--text-secondary); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.req-date { margin-left: auto; font-size: 0.76rem; color: var(--text-muted); }
+.req-badge { font-size: 0.72rem; font-weight: 700; padding: 2px 9px; border-radius: 100px; background: #EEF0F6; color: #5B6178; }
+.req-badge.st-대기 { background: #FFF4DE; color: #B7791F; }
+.req-badge.st-진행중 { background: #EAF0FF; color: #3B63D6; }
+.req-badge.st-완료 { background: #E3F7F0; color: #1F8A6E; }
+.req-badge.st-보류 { background: #F1F1F5; color: #6B7280; }
+.req-badge.pr-높음 { background: #FDEAF0; color: #D63D6A; }
+.req-codebox { margin: 4px 0 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-main); }
+.req-codebox summary { cursor: pointer; padding: 8px 12px; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); }
+.req-codebox pre { margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.78rem; line-height: 1.55; border-top: 1px solid var(--border); white-space: pre; }
+.req-response { font-size: 0.84rem; color: #1F8A6E; background: #E3F7F0; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.req-item footer { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.req-act { border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 5px 11px; font-size: 0.78rem; color: var(--text-secondary); cursor: pointer; }
+.req-act:hover { border-color: var(--primary); color: var(--primary); }
+.req-act.danger:hover { border-color: #EF4444; color: #EF4444; }
+@media (max-width: 560px) { .req-row { grid-template-columns: 1fr; } }
